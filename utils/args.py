@@ -20,7 +20,7 @@ def training_args():
     weight_decay = 5e-4
     log_interval = 50
     save_interval = 25
-    save_loc = "./"
+    save_loc = "./saved_models/"
     saved_model_name = "resnet50_350.model"
     epoch = 350
     first_milestone = 150  # Milestone for change in lr
