@@ -134,8 +134,8 @@ def eval_args():
     default_dataset = "cifar10"
     ood_dataset = "svhn"
     batch_size = 128
-    load_loc = "../Models/Normal/"
-    model = "resnet50"
+    load_loc = "./saved_models/"
+    model = "wide_resnet"
     sn_coeff = 3.0
     runs = 5
     ensemble = 5

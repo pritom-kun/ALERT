@@ -2,14 +2,14 @@
 Metrics to measure classification performance
 """
 
+import numpy as np
 import torch
+from sklearn.metrics import (accuracy_score, average_precision_score,
+                             confusion_matrix, roc_auc_score)
 from torch import nn
 from torch.nn import functional as F
 
 from utils.ensemble_utils import ensemble_forward_pass
-
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import confusion_matrix
 
 
 def get_logits_labels(model, data_loader, device):
@@ -46,7 +46,15 @@ def test_classification_net_softmax(softmax_prob, labels):
     predictions_list.extend(predictions.cpu().numpy())
     confidence_vals_list.extend(confidence_vals.cpu().numpy())
     accuracy = accuracy_score(labels_list, predictions_list)
-    return (
+
+    # print(labels_list)
+    # print(predictions_list)
+    corrects = ((np.array(predictions_list) == np.array(labels_list))).astype(int)
+
+    auroc = roc_auc_score(corrects, confidence_vals_list)
+    auprc = average_precision_score(corrects, confidence_vals_list)
+
+    return (auroc, auprc), (
         confusion_matrix(labels_list, predictions_list),
         accuracy,
         labels_list,
@@ -64,12 +72,16 @@ def test_classification_net_logits(logits, labels):
     return test_classification_net_softmax(softmax_prob, labels)
 
 
-def test_classification_net(model, data_loader, device):
+def test_classification_net(model, data_loader, device, auc=False):
     """
     This function reports classification accuracy and confusion matrix over a dataset.
     """
     logits, labels = get_logits_labels(model, data_loader, device)
-    return test_classification_net_logits(logits, labels)
+    auroc_aupr, res = test_classification_net_logits(logits, labels)
+    if auc:
+        return auroc_aupr, res
+    else:
+        return res
 
 
 def test_classification_net_ensemble(model_ensemble, data_loader, device):
@@ -93,3 +105,18 @@ def test_classification_net_ensemble(model_ensemble, data_loader, device):
     labels = torch.cat(labels, dim=0)
 
     return test_classification_net_softmax(softmax_prob, labels)
+
+
+# def brier_score(pred, label):
+
+#     print(pred)
+#     print(label)
+
+#     num_nodes = pred.shape[0]
+#     if num_nodes == 0:
+#         return np.nan
+#     indices = np.arange(num_nodes)
+#     prob = pred.copy()
+#     prob[indices, label] -= 1
+
+#     return np.mean(np.linalg.norm(prob, axis=-1, ord=2))
