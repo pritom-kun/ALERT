@@ -209,11 +209,11 @@ def al_args():
     num_initial_samples = 20
     max_training_samples = 300
     acquisition_batch_size = 5
-    epochs = 20
+    epochs = 10
 
-    train_batch_size = 64
-    test_batch_size = 512
-    scoring_batch_size = 128
+    train_batch_size = 16
+    test_batch_size = 16
+    scoring_batch_size = 16
 
     parser = argparse.ArgumentParser(description="Active Learning Experiments")
     parser.add_argument("--seed", type=int, dest="seed", required=True, help="Seed to use")
