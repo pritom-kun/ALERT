@@ -114,7 +114,7 @@ if __name__ == "__main__":
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
     # Run experiment
-    num_runs = 5
+    num_runs = 1
     test_accs = {}
     ambiguous_dict = {}
     ambiguous_entropies_dict = {}
@@ -138,10 +138,10 @@ if __name__ == "__main__":
 
         # Train loader for the current acquired training set
         sampler = active_learning.RandomFixedLengthSampler(
-            dataset=active_learning_data.training_dataset, target_length=64
+            dataset=active_learning_data.training_dataset, target_length=5056
         )
         train_loader = torch.utils.data.DataLoader(
-            active_learning_data.training_dataset, sampler=sampler, batch_size=args.train_batch_size, **kwargs,
+            active_learning_data.training_dataset, batch_size=args.train_batch_size, **kwargs,
         )
 
         small_train_loader = torch.utils.data.DataLoader(
@@ -158,8 +158,9 @@ if __name__ == "__main__":
         while True:
             print("Active Learning Iteration: " + str(active_learning_iteration) + " ================================>")
 
-            lr = 0.1
+            lr = 2e-5
             weight_decay = 5e-4
+            eps = 1e-8
             if args.al_type == "ensemble":
                 model_ensemble = [
                     model_fn(tokenizer, num_classes).to(device=device)
@@ -171,7 +172,7 @@ if __name__ == "__main__":
                     model.train()
             else:
                 model = model_fn(tokenizer, num_classes).to(device=device)
-                optimizer = torch.optim.Adam(model.parameters(), weight_decay=weight_decay)
+                optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=eps)
                 model.train()
 
             # Train
@@ -190,7 +191,7 @@ if __name__ == "__main__":
                     if args.al_type == "ensemble"
                     else test_classification_net(model, val_loader, device=device)
                 )
-                if val_accuracy > best_val_accuracy:
+                if val_accuracy >= best_val_accuracy:
                     best_val_accuracy = val_accuracy
                     best_model = model_ensemble if args.al_type == "ensemble" else model
 

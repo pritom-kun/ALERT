@@ -194,10 +194,10 @@ def eval_args():
 
 
 def al_args():
-    model_name = "resnet18"
-    trained_model_name = "resnet18_sn"
+    model_name = "scibert"
+    trained_model_name = "scibert"
     saved_model_path = "./"
-    saved_model_name = "resnet18_sn_3.0_50.model"
+    saved_model_name = "scibert.model"
     dataset_root = "./"
     threshold = 1.0
     subsample = 1000
@@ -206,9 +206,9 @@ def al_args():
     sn_coeff = 3.0
     num_ensemble = 5
 
-    num_initial_samples = 20
-    max_training_samples = 300
-    acquisition_batch_size = 5
+    num_initial_samples = 100
+    max_training_samples = 200
+    acquisition_batch_size = 10
     epochs = 10
 
     train_batch_size = 16
