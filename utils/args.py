@@ -207,7 +207,7 @@ def al_args():
     num_ensemble = 5
 
     num_initial_samples = 100
-    max_training_samples = 200
+    max_training_samples = 2100
     acquisition_batch_size = 10
     epochs = 10
 

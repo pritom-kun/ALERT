@@ -8,8 +8,9 @@ from torch.nn import functional as F
 
 from utils.ensemble_utils import ensemble_forward_pass
 
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, f1_score
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import precision_score, recall_score
 
 
 def get_logits_labels(model, data_loader, device):
@@ -46,9 +47,15 @@ def test_classification_net_softmax(softmax_prob, labels):
     predictions_list.extend(predictions.cpu().numpy())
     confidence_vals_list.extend(confidence_vals.cpu().numpy())
     accuracy = accuracy_score(labels_list, predictions_list)
+    precision = precision_score(labels_list, predictions_list, average="micro")
+    recall = recall_score(labels_list, predictions_list, average="micro")
+    f1 = f1_score(labels_list, predictions_list, average="micro")
     return (
         confusion_matrix(labels_list, predictions_list),
         accuracy,
+        precision,
+        recall,
+        f1,
         labels_list,
         predictions_list,
         confidence_vals_list,

@@ -186,7 +186,7 @@ if __name__ == "__main__":
                 else:
                     train_single_epoch(epoch, model, train_loader, optimizer, device)
 
-                _, val_accuracy, _, _, _ = (
+                _, val_accuracy, _, _, _, _, _, _ = (
                     test_classification_net_ensemble(model_ensemble, val_loader, device=device)
                     if args.al_type == "ensemble"
                     else test_classification_net(model, val_loader, device=device)
@@ -214,19 +214,30 @@ if __name__ == "__main__":
                 print("Testing the model: Ensemble======================================>")
                 for model in model_ensemble:
                     model.eval()
-                (conf_matrix, accuracy, labels_list, predictions, confidences,) = test_classification_net_ensemble(
+                (conf_matrix, accuracy, precision, recall, f1, labels_list, predictions, confidences,) = test_classification_net_ensemble(
                     model_ensemble, test_loader, device=device
                 )
 
             else:
                 print("Testing the model: Softmax/GMM======================================>")
-                (conf_matrix, accuracy, labels_list, predictions, confidences,) = test_classification_net(
+                (conf_matrix, accuracy, precision, recall, f1, labels_list, predictions, confidences,) = test_classification_net(
                     model, test_loader, device=device
                 )
+            
             percentage_correct = 100.0 * accuracy
-            test_accs[run].append(percentage_correct)
+            test_accs[run].append({
+                'accuracy': percentage_correct,
+                'precision': 100.0 * precision,
+                'recall': 100.0 * recall,
+                'f1': 100.0 * f1,
+                'training_samples': len(active_learning_data.training_dataset)
+            })
 
             print("Test set: Accuracy: ({:.2f}%)".format(percentage_correct))
+            print("Test set: Precision: ({:.2f}%)".format(100.0 * precision))
+            print("Test set: Recall: ({:.2f}%)".format(100.0 * recall))
+            print("Test set: F1: ({:.2f}%)".format(100.0 * f1))
+            print("Test set: Training samples: {}".format(len(active_learning_data.training_dataset)))
 
             # Breaking clause
             if len(active_learning_data.training_dataset) >= args.max_training_samples:
@@ -285,21 +296,16 @@ if __name__ == "__main__":
                 ambiguous_entropies_dict[run][active_learning_iteration] = entropies
             active_learning_iteration += 1
 
-    # Save the dictionaries
+    # Save the dictionaries with updated format
     save_name = model_save_name(args.model_name, args.sn, args.mod, args.coeff, args.seed)
     save_ensemble_mi = "_mi" if (args.al_type == "ensemble" and args.mi) else ""
+    
     if args.ambiguous:
         accuracy_file_name = (
-            "test_accs_" + save_name + '_' + args.al_type + save_ensemble_mi + "_dirty_mnist_" + str(args.subsample) + ".json"
-        )
-        ambiguous_file_name = (
-            "ambiguous_" + save_name + '_' + args.al_type + save_ensemble_mi + "_dirty_mnist_" + str(args.subsample) + ".json"
-        )
-        ambiguous_entropies_file_name = (
-            "ambiguous_entropies_" + save_name + '_' + args.al_type + save_ensemble_mi + "_dirty_mnist_" + str(args.subsample) + ".json"
+            "metrics_" + save_name + '_' + args.al_type + save_ensemble_mi + "_tabular_" + str(args.subsample) + ".json"
         )
     else:
-        accuracy_file_name = "test_accs_" + save_name + '_' + args.al_type + save_ensemble_mi + "_mnist.json"
+        accuracy_file_name = f"metrics_{save_name}_{args.al_type}{save_ensemble_mi}_tabular.json"
 
     with open(accuracy_file_name, "w") as acc_file:
         json.dump(test_accs, acc_file)
