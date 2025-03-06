@@ -223,17 +223,16 @@ if __name__ == "__main__":
                 (conf_matrix, accuracy, precision, recall, f1, labels_list, predictions, confidences,) = test_classification_net(
                     model, test_loader, device=device
                 )
-            
-            percentage_correct = 100.0 * accuracy
+
             test_accs[run].append({
-                'accuracy': percentage_correct,
+                'accuracy': 100.0 * accuracy,
                 'precision': 100.0 * precision,
                 'recall': 100.0 * recall,
                 'f1': 100.0 * f1,
                 'training_samples': len(active_learning_data.training_dataset)
             })
 
-            print("Test set: Accuracy: ({:.2f}%)".format(percentage_correct))
+            print("Test set: Accuracy: ({:.2f}%)".format(100.0 * accuracy))
             print("Test set: Precision: ({:.2f}%)".format(100.0 * precision))
             print("Test set: Recall: ({:.2f}%)".format(100.0 * recall))
             print("Test set: F1: ({:.2f}%)".format(100.0 * f1))
