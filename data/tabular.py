@@ -1,13 +1,12 @@
 import json
+import os
 
-import numpy as np
 import pandas as pd
 import torch
 import transformers
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.preprocessing import LabelEncoder
 from torch.utils import data
-from torch.utils.data import Sampler
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -63,14 +62,37 @@ class TabularDataset(data.Dataset):
 
         return feat, target
 
-def create_tabular_dataset(data_path, seed=0):
-
+def create_tabular_dataset(data_path, seed=0, splits_dir="data_splits"):
+    # Create directory for splits if it doesn't exist
+    os.makedirs(splits_dir, exist_ok=True)
+    
+    # Define paths for saving splits
+    splits_file = os.path.join(splits_dir, f"splits_seed_{seed}.json")
+    
     dataset = TabularDataset(data_path)
-    splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=seed)
+    
+    # Check if splits already exist
+    if os.path.exists(splits_file):
+        print(f"Loading existing splits from {splits_file}")
+        with open(splits_file, 'r') as f:
+            splits = json.load(f)
+        train_idx = splits['train_idx']
+        test_idx = splits['test_idx']
+    else:
+        splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=seed)
 
-    for train_idx, test_idx in splitter.split(dataset, dataset.targets.cpu()):
-        train_dataset = data.Subset(dataset, train_idx)
-        test_dataset = data.Subset(dataset, test_idx)
+        for train_idx, test_idx in splitter.split(dataset, dataset.targets.cpu()):
+            # Convert indices to Python lists for JSON serialization
+            train_idx = train_idx.tolist()
+            test_idx = test_idx.tolist()
+
+        # Save splits to disk
+        with open(splits_file, 'w') as f:
+            json.dump({'train_idx': train_idx, 'test_idx': test_idx}, f)
+        print(f"Saved splits to {splits_file}")
+
+    train_dataset = data.Subset(dataset, train_idx)
+    test_dataset = data.Subset(dataset, test_idx)
 
     print(f"Train dataset size: {len(train_dataset)}")
     print(f"Test dataset size: {len(test_dataset)}")
