@@ -1,6 +1,7 @@
 import json
 import os
 
+import pickle
 import pandas as pd
 import torch
 import transformers
@@ -12,7 +13,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class TabularDataset(data.Dataset):
-    def __init__(self, data_path):
+    def __init__(self, data_path, save_dir=None):
 
         with open(data_path) as f:
             data_json = json.loads(f.read())
@@ -27,15 +28,23 @@ class TabularDataset(data.Dataset):
 
         self.tokenizer = transformers.BertTokenizer.from_pretrained("allenai/scibert_scivocab_uncased", max_length=512)
 
-        encoder = LabelEncoder()
-        encoder.fit(alldata[['label']])
+        encoder_path = os.path.join(save_dir, "label_encoder.pkl")
+
+        if os.path.exists(encoder_path):
+            # Load existing encoder
+            with open(encoder_path, 'rb') as f:
+                encoder = pickle.load(f)
+        else:
+            # Fit and save the encoder if it doesn't exist
+            encoder = LabelEncoder()
+            encoder.fit(alldata[['label']])
+            with open(encoder_path, 'wb') as f:
+                pickle.dump(encoder, f)
 
         print("Number of categories:", len(encoder.classes_))
 
         self.data = self._tokenize(alldata['text'].tolist())
         self.targets = torch.from_numpy(encoder.transform(alldata[['label']])).to(torch.int64)
-
-        # print(self.targets)
 
         # Put both data and targets on GPU in advance
         self.data, self.targets = self.data.to(device), self.targets.to(device)
@@ -62,15 +71,15 @@ class TabularDataset(data.Dataset):
 
         return feat, target
 
-def create_tabular_dataset(data_path, seed=0, splits_dir="data_splits"):
+def create_tabular_dataset(data_path, seed=0, save_dir="./saves"):
     # Create directory for splits if it doesn't exist
-    os.makedirs(splits_dir, exist_ok=True)
-    
+    os.makedirs(save_dir, exist_ok=True)
+
     # Define paths for saving splits
-    splits_file = os.path.join(splits_dir, f"splits_seed_{seed}.json")
-    
-    dataset = TabularDataset(data_path)
-    
+    splits_file = os.path.join(save_dir, f"splits_seed_{seed}.json")
+
+    dataset = TabularDataset(data_path, save_dir)
+
     # Check if splits already exist
     if os.path.exists(splits_file):
         print(f"Loading existing splits from {splits_file}")

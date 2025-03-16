@@ -164,3 +164,4 @@ data/FastMNIST*
 data/*.mat
 saved_models/
 *.json
+saves/
