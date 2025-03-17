@@ -201,7 +201,7 @@ def al_args():
     dataset_root = "./"
     threshold = 1.0
     subsample = 1000
-    al_acquisition = "softmax"
+    al_acquisition = "gmm"
 
     sn_coeff = 3.0
     num_ensemble = 5
@@ -296,7 +296,7 @@ def al_args():
         "--al-type",
         type=str,
         default=al_acquisition,
-        choices=["entropy", "confidence", "ensemble", "gmm"],
+        choices=["entropy", "confidence", "margin", "gmm", "ensemble"],
         dest="al_type",
         help="Type of model to use for AL.",
     )

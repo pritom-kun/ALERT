@@ -16,7 +16,7 @@ from net.bert import scibert
 from utils.train_utils import train_single_epoch, model_save_name
 
 # Importing uncertainty metrics
-from metrics.uncertainty_confidence import entropy, logsumexp, confidence
+from metrics.uncertainty_confidence import entropy, margin, confidence
 from metrics.classification_metrics import test_classification_net
 from metrics.classification_metrics import test_classification_net_ensemble
 
@@ -274,30 +274,30 @@ if __name__ == "__main__":
                         storage_device="cpu",
                     )
                     (candidate_scores, candidate_indices,) = active_learning.get_top_k_scorers(
-                        compute_density(logits, class_prob), args.acquisition_batch_size, uncertainty=False,
-                    )
-                elif args.al_type == "entropy":
-                    logits = []
-                    with torch.no_grad():
-                        for data, _ in pool_loader:
-                            data = data.to(device)
-                            logits.append(model(data))
-                        logits = torch.cat(logits, dim=0)
-                    (candidate_scores, candidate_indices,) = active_learning.find_acquisition_batch(
-                        logits, args.acquisition_batch_size, entropy
-                    )
-                elif args.al_type == "confidence":
-                    logits = []
-                    with torch.no_grad():
-                        for data, _ in pool_loader:
-                            data = data.to(device)
-                            logits.append(model(data))
-                        logits = torch.cat(logits, dim=0)
-                    (candidate_scores, candidate_indices,) = active_learning.find_acquisition_batch(
-                        logits, args.acquisition_batch_size, confidence
+                        compute_density(logits, class_prob), args.acquisition_batch_size, uncertainty="gmm",
                     )
                 else:
-                    raise ValueError("Unknown acquisition function")
+                    if args.al_type == "entropy":
+                        score_function = entropy
+                        uncertainty = "entropy"
+                    elif args.al_type == "confidence":
+                        score_function = confidence
+                        uncertainty = "confidence"
+                    elif args.al_type == "margin":
+                        score_function = margin
+                        uncertainty = "margin"
+                    else:
+                        raise ValueError("Unknown acquisition function")
+
+                    logits = []
+                    with torch.no_grad():
+                        for data, _ in pool_loader:
+                            data = data.to(device)
+                            logits.append(model(data))
+                        logits = torch.cat(logits, dim=0)
+                    (candidate_scores, candidate_indices,) = active_learning.find_acquisition_batch(
+                        logits, args.acquisition_batch_size, score_function, uncertainty
+                    )
 
             # Performing acquisition
             active_learning_data.acquire(candidate_indices)

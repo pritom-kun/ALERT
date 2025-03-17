@@ -23,6 +23,14 @@ def confidence(logits):
     return confidence
 
 
+def margin(logits):
+    p = F.softmax(logits, dim=1)
+    sorted_probs, _ = torch.sort(p, dim=1, descending=True)
+    # Calculate margin between highest and second highest probability
+    margin = sorted_probs[:, 0] - sorted_probs[:, 1]
+    return margin
+
+
 def entropy_prob(probs):
     p = probs
     eps = 1e-12

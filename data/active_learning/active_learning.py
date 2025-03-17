@@ -112,14 +112,15 @@ def get_balanced_sample_indices(dataset: data.Dataset, num_classes, n_per_digit=
 
 
 # Acquisition functionality
-def get_top_k_scorers(scores_N, batch_size, uncertainty=True):
+def get_top_k_scorers(scores_N, batch_size, uncertainty="entropy"):
     N = len(scores_N)
     batch_size = min(batch_size, N)
-    candidate_scores, candidate_indices = torch.topk(scores_N, batch_size, largest=uncertainty)
+    largest = True if uncertainty == "entropy" else False
+    candidate_scores, candidate_indices = torch.topk(scores_N, batch_size, largest=largest)
     return candidate_scores.tolist(), candidate_indices.tolist()
 
 
-def find_acquisition_batch(logits, batch_size, score_function, uncertainty=True):
+def find_acquisition_batch(logits, batch_size, score_function, uncertainty="entropy"):
     scores = score_function(logits)
     return get_top_k_scorers(scores, batch_size=batch_size, uncertainty=uncertainty)
 
