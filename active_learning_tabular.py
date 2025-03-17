@@ -276,7 +276,7 @@ if __name__ == "__main__":
                     (candidate_scores, candidate_indices,) = active_learning.get_top_k_scorers(
                         compute_density(logits, class_prob), args.acquisition_batch_size, uncertainty=False,
                     )
-                else:
+                elif args.al_type == "entropy":
                     logits = []
                     with torch.no_grad():
                         for data, _ in pool_loader:
@@ -286,6 +286,18 @@ if __name__ == "__main__":
                     (candidate_scores, candidate_indices,) = active_learning.find_acquisition_batch(
                         logits, args.acquisition_batch_size, entropy
                     )
+                elif args.al_type == "confidence":
+                    logits = []
+                    with torch.no_grad():
+                        for data, _ in pool_loader:
+                            data = data.to(device)
+                            logits.append(model(data))
+                        logits = torch.cat(logits, dim=0)
+                    (candidate_scores, candidate_indices,) = active_learning.find_acquisition_batch(
+                        logits, args.acquisition_batch_size, confidence
+                    )
+                else:
+                    raise ValueError("Unknown acquisition function")
 
             # Performing acquisition
             active_learning_data.acquire(candidate_indices)

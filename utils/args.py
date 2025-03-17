@@ -296,7 +296,7 @@ def al_args():
         "--al-type",
         type=str,
         default=al_acquisition,
-        choices=["softmax", "ensemble", "gmm"],
+        choices=["entropy", "confidence", "ensemble", "gmm"],
         dest="al_type",
         help="Type of model to use for AL.",
     )
