@@ -204,7 +204,7 @@ if __name__ == "__main__":
                 # Fit the GMM on the trained model
                 model.eval()
                 embeddings, labels = get_embeddings(
-                    model, small_train_loader, num_dim=50, dtype=torch.double, device="cuda", storage_device="cuda",
+                    model, small_train_loader, num_dim=768, dtype=torch.double, device="cuda", storage_device="cuda",
                 )
                 gaussians_model, jitter_eps = gmm_fit(embeddings=embeddings, labels=labels, num_classes=num_classes)
             print("Training ended")

@@ -9,22 +9,19 @@ class SciBERT(nn.Module):
         "allenai/scibert_scivocab_uncased",
         num_labels=num_classes,
         output_attentions=False,
-        output_hidden_states=False,
+        output_hidden_states=True,
     )
-
         self.tokenizer = tokenizer
-
         self.feature = None
 
     def forward(self, x):
         out = self.model(x, attention_mask=x.ne(self.tokenizer.pad_token_id).to(int))
 
-        self.feature = out.logits.clone().detach()
+        self.feature = out.hidden_states[-1][:, 0, :].clone().detach()
         return out.logits
 
 
 def scibert(tokenizer, num_classes=5):
 
-    model = SciBERT(tokenizer, num_classes)
+    return SciBERT(tokenizer, num_classes)
 
-    return model
