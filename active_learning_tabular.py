@@ -1,11 +1,12 @@
 import json
 import torch
 import numpy as np
-import torch.backends.cudnn as cudnn
+import torch.nn.functional as F
+from torch.backends import cudnn
 
 # Import data utilities
-import torch.utils.data as data
-import data.active_learning.active_learning as active_learning
+from torch.utils import data
+from data.active_learning import active_learning
 from data.ambiguous_mnist.ambiguous_mnist_dataset import AmbiguousMNIST
 from data.tabular import create_tabular_dataset
 
@@ -25,6 +26,7 @@ from utils.args import al_args
 
 # Importing GMM utilities
 from utils.gmm_utils import get_embeddings, gmm_evaluate, gmm_fit
+from utils.dropout_utils import train_dropout
 from utils.ensemble_utils import ensemble_forward_pass
 
 
@@ -207,6 +209,15 @@ if __name__ == "__main__":
                     model, small_train_loader, num_dim=768, dtype=torch.double, device=device, storage_device="cuda",
                 )
                 gaussians_model, jitter_eps = gmm_fit(embeddings=embeddings, labels=labels, num_classes=num_classes)
+
+            elif args.al_type == "dropout":
+                # Train the dropout head
+                model.eval()
+                embeddings, labels = get_embeddings(
+                    model, small_train_loader, num_dim=768, dtype=torch.float32, device=device, storage_device="cuda",
+                )
+                dropout_head = train_dropout(embeddings, labels, num_classes, args.train_batch_size, epochs=10, device=device)
+
             print("Training ended")
 
             # Testing the models
@@ -275,6 +286,29 @@ if __name__ == "__main__":
                 (candidate_scores, candidate_indices,) = active_learning.get_top_k_scorers(
                     compute_density(logits, class_prob), args.acquisition_batch_size, uncertainty="gmm",
                 )
+            elif args.al_type == "dropout":
+                model.eval()
+                dropout_head.eval()
+                dropout_head.dropout.train()
+
+                embeddings, _ = get_embeddings(
+                    model, pool_loader, num_dim=768, dtype=torch.float32, device=device, storage_device="cuda",
+                )
+
+                all_probs = []
+                for _ in range(10):
+                    with torch.no_grad():
+                        logits = dropout_head(embeddings)
+                        probs = F.softmax(logits, dim=1)
+                        all_probs.append(probs)
+
+                p = torch.stack(all_probs).mean(0)
+                entropy_values = -torch.sum(p * torch.log(p + 1e-10), dim=1)
+
+                (candidate_scores, candidate_indices,) = active_learning.get_top_k_scorers(
+                    entropy_values, args.acquisition_batch_size, uncertainty="entropy",
+                )
+
             elif args.al_type == "coreset":
                 # Get embeddings for the labeled data
                 model.eval()
