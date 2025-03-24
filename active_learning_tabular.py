@@ -296,7 +296,7 @@ if __name__ == "__main__":
                 )
 
                 all_probs = []
-                for _ in range(10):
+                for _ in range(args.mc_dropout_passes):
                     with torch.no_grad():
                         logits = dropout_head(embeddings)
                         probs = F.softmax(logits, dim=1)

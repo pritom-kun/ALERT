@@ -211,6 +211,8 @@ def al_args():
     acquisition_batch_size = 10
     epochs = 10
 
+    mc_dropout_passes = 10
+
     train_batch_size = 16
     test_batch_size = 16
     scoring_batch_size = 16
@@ -303,6 +305,9 @@ def al_args():
 
     parser.add_argument("-mi", action="store_true", dest="mi", help="Use MI as acquisition function")
     parser.set_defaults(mi=False)
+
+    parser.add_argument('--mc_dropout_passes', type=int, default=mc_dropout_passes,
+                    help='Number of forward passes for Monte Carlo Dropout')
 
     parser.add_argument(
         "--num-initial-samples",
