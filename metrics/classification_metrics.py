@@ -1,10 +1,7 @@
-import numpy as np
-import warnings
 import torch
-from sklearn.metrics import (accuracy_score, average_precision_score,
-                             confusion_matrix, f1_score, roc_auc_score)
-from sklearn.preprocessing import label_binarize
+from sklearn.metrics import accuracy_score, confusion_matrix
 from torch.nn import functional as F
+from torchmetrics import AUROC, Accuracy, AveragePrecision, F1Score
 
 from utils.ensemble_utils import ensemble_forward_pass
 
@@ -52,55 +49,45 @@ def test_classification_net_softmax(softmax_prob, labels):
     )
 
 
-def test_classification_net_auc_roc(softmax_prob, labels):
+def test_classification_net_auc_roc(softmax_prob, labels, device):
     """
-    This function reports classification accuracy and confusion matrix given softmax vectors and
-    labels from a model.
+    Calculate classification metrics using TorchMetrics.
+    
+    Args:
+        softmax_prob (torch.Tensor): Softmax probabilities from model
+        labels (torch.Tensor): Ground truth labels
+        num_classes (int): Number of classes
+        
+    Returns:
+        tuple: (accuracy, auroc, average_precision, f1_micro, f1_macro)
     """
-    confidence_vals, predictions = torch.max(softmax_prob, dim=1)
 
-    softmax_prob_np = softmax_prob.cpu().numpy()
-    labels_np = labels.cpu().numpy()
-    predictions_np = predictions.cpu().numpy()
+    num_classes = softmax_prob.shape[-1]
+    # Initialize metrics
+    accuracy_metric = Accuracy(task="multiclass", num_classes=num_classes).to(device)
+    auroc_metric = AUROC(task="multiclass", num_classes=num_classes).to(device)
+    aupr_metric = AveragePrecision(task="multiclass", num_classes=num_classes).to(device)
+    f1_micro_metric = F1Score(task="multiclass", num_classes=num_classes, average="micro").to(device)
+    f1_macro_metric = F1Score(task="multiclass", num_classes=num_classes, average="macro").to(device)
 
-    accuracy = accuracy_score(labels_np, predictions_np)
-    f1_micro = f1_score(labels_np, predictions_np, average="micro")
-    f1_macro = f1_score(labels_np, predictions_np, average="macro")
+    # Calculate metrics
+    accuracy = accuracy_metric(softmax_prob, labels)
+    auroc = auroc_metric(softmax_prob, labels)
+    aupr = aupr_metric(softmax_prob, labels)
+    f1_micro = f1_micro_metric(softmax_prob, labels)
+    f1_macro = f1_macro_metric(softmax_prob, labels)
 
-    num_classes = softmax_prob_np.shape[1]
-    # Binarize true labels for one-vs-rest AUPR
-    labels_binarized = label_binarize(labels_np, classes=np.arange(num_classes))
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")  # suppress ROC/AUPR warnings
-        try:
-            auroc = roc_auc_score(labels_np, softmax_prob_np, multi_class="ovr", labels=np.arange(num_classes))
-        except ValueError:
-            auroc = float("nan")
-
-        try:
-            aupr = average_precision_score(labels_binarized, softmax_prob_np, average="macro")
-        except ValueError:
-            aupr = float("nan")
-
-    return (
-        confusion_matrix(labels_np, predictions_np),
-        accuracy,
-        f1_micro,
-        f1_macro,
-        auroc,
-        aupr
-    )
+    return accuracy.item(), f1_micro.item(), f1_macro.item(), auroc.item(), aupr.item()
 
 
-def test_classification_net_logits(logits, labels, auc_roc=False):
+def test_classification_net_logits(logits, labels, device='cpu', auc_roc=False):
     """
     This function reports classification accuracy and confusion matrix given logits and labels
     from a model.
     """
     softmax_prob = F.softmax(logits, dim=1)
     if auc_roc:
-        return test_classification_net_auc_roc(softmax_prob, labels)
+        return test_classification_net_auc_roc(softmax_prob, labels, device)
     else:
         return test_classification_net_softmax(softmax_prob, labels)
 
@@ -110,7 +97,7 @@ def test_classification_net(model, data_loader, device, auc_roc=False):
     This function reports classification accuracy and confusion matrix over a dataset.
     """
     logits, labels = get_logits_labels(model, data_loader, device)
-    return test_classification_net_logits(logits, labels, auc_roc)
+    return test_classification_net_logits(logits, labels, device, auc_roc)
 
 
 def test_classification_net_ensemble(model_ensemble, data_loader, device, auc_roc=False):

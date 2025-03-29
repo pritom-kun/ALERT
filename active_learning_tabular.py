@@ -189,7 +189,7 @@ if __name__ == "__main__":
                 else:
                     train_single_epoch(epoch, model, train_loader, optimizer, device)
 
-                _, val_accuracy, _, _, _, _ = (
+                val_accuracy, _, _, _, _ = (
                     test_classification_net_ensemble(model_ensemble, val_loader, device=device, auc_roc=True)
                     if args.al_type == "ensemble"
                     else test_classification_net(model, val_loader, device=device, auc_roc=True)
@@ -226,13 +226,13 @@ if __name__ == "__main__":
                 print("Testing the model: Ensemble======================================>")
                 for model in model_ensemble:
                     model.eval()
-                (conf_matrix, accuracy, f1_micro, f1_macro, auroc, aupr) = test_classification_net_ensemble(
+                (accuracy, f1_micro, f1_macro, auroc, aupr) = test_classification_net_ensemble(
                     model_ensemble, test_loader, device=device, auc_roc=True
                 )
 
             else:
                 print("Testing the model: Softmax/GMM======================================>")
-                (conf_matrix, accuracy, f1_micro, f1_macro, auroc, aupr) = test_classification_net(
+                (accuracy, f1_micro, f1_macro, auroc, aupr) = test_classification_net(
                     model, test_loader, device=device, auc_roc=True
                 )
 
@@ -341,6 +341,9 @@ if __name__ == "__main__":
                 candidate_scores, candidate_indices = active_learning.greedy_coreset_selection(
                     unlabeled_embeddings, labeled_embeddings, args.acquisition_batch_size
                 )
+            elif args.al_type == "random":
+                candidate_indices = np.random.choice(N, args.acquisition_batch_size, replace=False)
+                candidate_scores = torch.zeros(args.acquisition_batch_size).to(device)
             else:
                 model.eval()
 
