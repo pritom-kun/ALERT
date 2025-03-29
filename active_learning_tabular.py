@@ -1,3 +1,4 @@
+import os
 import json
 import torch
 import numpy as np
@@ -17,7 +18,7 @@ from net.bert import scibert
 from utils.train_utils import train_single_epoch, model_save_name
 
 # Importing uncertainty metrics
-from metrics.uncertainty_confidence import entropy, margin, confidence
+from metrics.uncertainty_confidence import entropy, energy_score, margin, confidence
 from metrics.classification_metrics import test_classification_net
 from metrics.classification_metrics import test_classification_net_ensemble
 
@@ -188,10 +189,10 @@ if __name__ == "__main__":
                 else:
                     train_single_epoch(epoch, model, train_loader, optimizer, device)
 
-                _, val_accuracy, _, _, _, _, _, _ = (
-                    test_classification_net_ensemble(model_ensemble, val_loader, device=device)
+                _, val_accuracy, _, _, _, _ = (
+                    test_classification_net_ensemble(model_ensemble, val_loader, device=device, auc_roc=True)
                     if args.al_type == "ensemble"
-                    else test_classification_net(model, val_loader, device=device)
+                    else test_classification_net(model, val_loader, device=device, auc_roc=True)
                 )
                 if val_accuracy >= best_val_accuracy:
                     best_val_accuracy = val_accuracy
@@ -225,29 +226,44 @@ if __name__ == "__main__":
                 print("Testing the model: Ensemble======================================>")
                 for model in model_ensemble:
                     model.eval()
-                (conf_matrix, accuracy, precision, recall, f1, labels_list, predictions, confidences,) = test_classification_net_ensemble(
-                    model_ensemble, test_loader, device=device
+                (conf_matrix, accuracy, f1_micro, f1_macro, auroc, aupr) = test_classification_net_ensemble(
+                    model_ensemble, test_loader, device=device, auc_roc=True
                 )
 
             else:
                 print("Testing the model: Softmax/GMM======================================>")
-                (conf_matrix, accuracy, precision, recall, f1, labels_list, predictions, confidences,) = test_classification_net(
-                    model, test_loader, device=device
+                (conf_matrix, accuracy, f1_micro, f1_macro, auroc, aupr) = test_classification_net(
+                    model, test_loader, device=device, auc_roc=True
                 )
 
             test_accs[run].append({
                 'accuracy': 100.0 * accuracy,
-                'precision': 100.0 * precision,
-                'recall': 100.0 * recall,
-                'f1': 100.0 * f1,
+                'f1_micro': 100.0 * f1_micro,
+                'f1_macro': 100.0 * f1_macro,
+                'auroc': 100.0 * auroc,
+                'aupr': 100.0 * aupr,
                 'training_samples': len(active_learning_data.training_dataset)
             })
 
-            print("Test set: Accuracy: ({:.2f}%)".format(100.0 * accuracy))
-            print("Test set: Precision: ({:.2f}%)".format(100.0 * precision))
-            print("Test set: Recall: ({:.2f}%)".format(100.0 * recall))
-            print("Test set: F1: ({:.2f}%)".format(100.0 * f1))
-            print("Test set: Training samples: {}".format(len(active_learning_data.training_dataset)))
+            print(f"Test set: Accuracy: ({100.0 * accuracy:.2f}%)")
+            print(f"Test set: F1 (micro): ({100.0 * f1_micro:.2f}%)")
+            print(f"Test set: F1 (macro): ({100.0 * f1_macro:.2f}%)")
+            print(f"Test set: AUROC: ({100.0 * auroc:.2f}%)")
+            print(f"Test set: AUPR: ({100.0 * aupr:.2f}%)")
+            print(f"Test set: Training samples: {len(active_learning_data.training_dataset)}")
+
+            # Save model at specific training sample counts
+            save_checkpoints = [600, 1100, 1600, 2100]
+            curr_train_len = len(active_learning_data.training_dataset)
+
+            if curr_train_len in save_checkpoints:
+                os.makedirs("checkpoints", exist_ok=True)
+                model_save_path = f"checkpoints/al_type_{args.al_type}_{curr_train_len}_samples.pt"
+                if args.al_type == "ensemble":
+                    torch.save([m.state_dict() for m in model_ensemble], model_save_path)
+                else:
+                    torch.save(model.state_dict(), model_save_path)
+                print(f"Saved model at {curr_train_len} training samples to {model_save_path}")
 
             # Breaking clause
             if len(active_learning_data.training_dataset) >= args.max_training_samples:
@@ -331,6 +347,9 @@ if __name__ == "__main__":
                 if args.al_type == "entropy":
                     score_function = entropy
                     uncertainty = "entropy"
+                elif args.al_type == "energy":
+                    score_function = energy_score
+                    uncertainty = "energy"
                 elif args.al_type == "confidence":
                     score_function = confidence
                     uncertainty = "confidence"
@@ -358,16 +377,17 @@ if __name__ == "__main__":
                 ambiguous_entropies_dict[run][active_learning_iteration] = entropies
             active_learning_iteration += 1
 
-    # Save the dictionaries with updated format
+    # Save the dictionaries
     save_name = model_save_name(args.model_name, args.sn, args.mod, args.coeff, args.seed)
     save_ensemble_mi = "_mi" if (args.al_type == "ensemble" and args.mi) else ""
-    
+
+    os.makedirs("results", exist_ok=True)
     if args.ambiguous:
-        accuracy_file_name = (
-            "metrics_" + save_name + '_' + args.al_type + save_ensemble_mi + "_tabular_" + str(args.subsample) + ".json"
-        )
+        accuracy_file_name = f"results/test_accs_{save_name}_{args.al_type}{save_ensemble_mi}_dirty_mnist_{args.subsample}.json"
+        ambiguous_file_name = f"results/ambiguous_{save_name}_{args.al_type}{save_ensemble_mi}_dirty_mnist_{args.subsample}.json"
+        ambiguous_entropies_file_name = f"results/ambiguous_entropies_{save_name}_{args.al_type}{save_ensemble_mi}_dirty_mnist_{args.subsample}.json"
     else:
-        accuracy_file_name = f"metrics_{save_name}_{args.al_type}{save_ensemble_mi}_tabular.json"
+        accuracy_file_name = f"results/test_accs_{save_name}_{args.al_type}{save_ensemble_mi}__mnist.json"
 
     with open(accuracy_file_name, "w") as acc_file:
         json.dump(test_accs, acc_file)

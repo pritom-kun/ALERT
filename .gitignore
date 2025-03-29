@@ -163,5 +163,6 @@ data/cifar*
 data/FastMNIST*
 data/*.mat
 saved_models/
-*.json
+checkpoints/
 saves/
+results/

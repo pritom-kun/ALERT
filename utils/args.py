@@ -298,7 +298,7 @@ def al_args():
         "--al-type",
         type=str,
         default=al_acquisition,
-        choices=["entropy", "confidence", "margin", "gmm", "dropout", "coreset", "ensemble"],
+        choices=["entropy", "energy", "confidence", "margin", "gmm", "dropout", "coreset", "ensemble"],
         dest="al_type",
         help="Type of model to use for AL.",
     )

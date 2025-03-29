@@ -13,8 +13,24 @@ def entropy(logits):
     return entropy
 
 
-def logsumexp(logits):
-    return torch.logsumexp(logits, dim=1, keepdim=False)
+def logsumexp(logits, temperature=1.0):
+    return torch.logsumexp(logits / temperature, dim=1, keepdim=False)
+
+
+def energy_score(logits, temperature=1.0):
+    """
+    Compute energy-based uncertainty scores.
+    Lower energy = higher confidence, higher energy = higher uncertainty.
+    
+    Args:
+        logits: Raw model outputs before softmax
+        temperature: Temperature parameter to scale the energy
+        
+    Returns:
+        Energy scores for each sample
+    """
+    # Energy is defined as negative logsumexp of logits
+    return -temperature * logsumexp(logits, temperature=temperature)
 
 
 def confidence(logits):

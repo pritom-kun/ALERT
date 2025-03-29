@@ -94,8 +94,8 @@ def get_balanced_sample_indices(dataset: data.Dataset, num_classes, n_per_digit=
     num_samples_by_class = collections.defaultdict(int)
     initial_samples = []
 
-    for i in range(len(permed_indices)):
-        permed_index = int(permed_indices[i])
+    for _, permed_index in enumerate(permed_indices):
+        permed_index = int(permed_index)
         _, label = dataset[permed_index]
         index, target = permed_index, int(label)
 
@@ -116,7 +116,7 @@ def get_balanced_sample_indices(dataset: data.Dataset, num_classes, n_per_digit=
 def get_top_k_scorers(scores_N, batch_size, uncertainty="entropy"):
     N = len(scores_N)
     batch_size = min(batch_size, N)
-    largest = True if uncertainty == "entropy" else False
+    largest = True if uncertainty in ["entropy", "energy"] else False
     candidate_scores, candidate_indices = torch.topk(scores_N, batch_size, largest=largest)
     return candidate_scores.tolist(), candidate_indices.tolist()
 
