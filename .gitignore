@@ -166,3 +166,4 @@ saved_models/
 checkpoints/
 saves/
 results/
+notebooks/*.png
