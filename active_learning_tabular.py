@@ -390,7 +390,7 @@ if __name__ == "__main__":
         ambiguous_file_name = f"results/ambiguous_{save_name}_{args.al_type}{save_ensemble_mi}_dirty_mnist_{args.subsample}.json"
         ambiguous_entropies_file_name = f"results/ambiguous_entropies_{save_name}_{args.al_type}{save_ensemble_mi}_dirty_mnist_{args.subsample}.json"
     else:
-        accuracy_file_name = f"results/test_accs_{save_name}_{args.al_type}{save_ensemble_mi}__mnist.json"
+        accuracy_file_name = f"results/metrics_{save_name}_{args.al_type}{save_ensemble_mi}_tabular.json"
 
     with open(accuracy_file_name, "w") as acc_file:
         json.dump(test_accs, acc_file)
