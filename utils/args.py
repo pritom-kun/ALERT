@@ -206,7 +206,8 @@ def al_args():
     sn_coeff = 3.0
     num_ensemble = 5
 
-    num_initial_samples = 100
+    num_classes = 40 # 40 when OOD
+    num_initial_samples = 80
     max_training_samples = 2100
     acquisition_batch_size = 10
     epochs = 10
@@ -308,6 +309,14 @@ def al_args():
 
     parser.add_argument('--mc_dropout_passes', type=int, default=mc_dropout_passes,
                     help='Number of forward passes for Monte Carlo Dropout')
+
+    parser.add_argument(
+        "--num-classes",
+        type=int,
+        default=num_classes,
+        dest="num_classes",
+        help="Number of classes in the training dataset",
+    )
 
     parser.add_argument(
         "--num-initial-samples",
