@@ -18,7 +18,7 @@ from net.bert import scibert
 from utils.train_utils import train_single_epoch, model_save_name
 
 # Importing uncertainty metrics
-from metrics.uncertainty_confidence import entropy, energy_score, margin, confidence
+from metrics.uncertainty_confidence import entropy, energy_score, margin, confidence, logsumexp, entropy_prob
 from metrics.classification_metrics import test_classification_net
 from metrics.classification_metrics import test_classification_net_ensemble
 from metrics.ood_metrics import get_roc_auc, get_roc_auc_logits, get_roc_auc_ensemble
@@ -238,30 +238,87 @@ if __name__ == "__main__":
                 (_, _, _), (_, _, _), ood_auroc, ood_aupr = get_roc_auc_ensemble(
                 model_ensemble, id_test_loader, ood_test_loader, "entropy", device
                 )
-
             else:
                 print("Testing the model: Softmax/GMM======================================>")
                 (accuracy, f1_micro, f1_macro, auroc, aupr) = test_classification_net(
                     model, id_test_loader, device=device, auc_roc=True
                 )
-                if args.al_type == "entropy":
-                    score_function = entropy
-                    confidence_bool = False
-                elif args.al_type == "energy":
-                    score_function = energy_score
-                    confidence_bool = False
-                elif args.al_type == "confidence":
-                    score_function = confidence
-                    confidence_bool = True
-                elif args.al_type == "margin":
-                    score_function = margin
-                    confidence_bool = True
-                else:
-                    raise ValueError("Unknown acquisition function")
+                if args.al_type == "gmm":
+                    model.eval()
+                    logits, labels = gmm_evaluate(
+                        model,
+                        gaussians_model,
+                        id_test_loader,
+                        device=device,
+                        num_classes=args.num_classes,
+                        storage_device=device
+                    )
+                    ood_logits, ood_labels = gmm_evaluate(
+                        model,
+                        gaussians_model,
+                        ood_test_loader,
+                        device=device,
+                        num_classes=args.num_classes,
+                        storage_device=device
+                    )
 
-                (_, _, _), (_, _, _), ood_auroc, ood_aupr = get_roc_auc(
-                    model, id_test_loader, ood_test_loader, score_function, device, confidence=confidence_bool
-                )
+                    (_, _, _), (_, _, _), ood_auroc, ood_aupr = get_roc_auc_logits(
+                        logits, ood_logits, logsumexp, device, confidence=True
+                    )
+                elif args.al_type == "dropout":
+                    model.eval()
+                    dropout_head.eval()
+
+                    id_embeddings, _ = get_embeddings(
+                        model, id_test_loader, num_dim=768, dtype=torch.float32, device=device, storage_device="cuda",
+                    )
+                    ood_embeddings, _ = get_embeddings(
+                        model, ood_test_loader, num_dim=768, dtype=torch.float32, device=device, storage_device="cuda",
+                    )
+
+                    # Process all embeddings together with the same dropout patterns
+                    all_id_probs = []
+                    all_ood_probs = []
+                    for pass_idx in range(args.mc_dropout_passes):
+                        # Set dropout to training mode for this pass
+                        dropout_head.dropout.train()
+                        with torch.no_grad():
+                            # Process ID samples
+                            id_logits = dropout_head(id_embeddings)
+                            id_prob = F.softmax(id_logits, dim=1)
+                            all_id_probs.append(id_prob)
+                            
+                            # Process OOD samples with the same dropout pattern
+                            ood_logits = dropout_head(ood_embeddings)
+                            ood_prob = F.softmax(ood_logits, dim=1)
+                            all_ood_probs.append(ood_prob)
+                    
+                    # Average results across passes
+                    id_probs = torch.stack(all_id_probs).mean(0)
+                    ood_probs = torch.stack(all_ood_probs).mean(0)
+
+                    (_, _, _), (_, _, _), ood_auroc, ood_aupr = get_roc_auc_logits(
+                        id_probs, ood_probs, entropy_prob, device, confidence=False
+                    )
+                else:
+                    if args.al_type == "entropy":
+                        score_function = entropy
+                        confidence_bool = False
+                    elif args.al_type == "energy":
+                        score_function = energy_score
+                        confidence_bool = False
+                    elif args.al_type == "confidence":
+                        score_function = confidence
+                        confidence_bool = True
+                    elif args.al_type == "margin":
+                        score_function = margin
+                        confidence_bool = True
+                    else:
+                        raise ValueError("Unknown acquisition function")
+
+                    (_, _, _), (_, _, _), ood_auroc, ood_aupr = get_roc_auc(
+                        model, id_test_loader, ood_test_loader, score_function, device, confidence=confidence_bool
+                    )
 
             test_accs[run].append({
                 'accuracy': 100.0 * accuracy,
@@ -348,12 +405,10 @@ if __name__ == "__main__":
                         logits = dropout_head(embeddings)
                         probs = F.softmax(logits, dim=1)
                         all_probs.append(probs)
+                probs = torch.stack(all_probs).mean(0)
 
-                p = torch.stack(all_probs).mean(0)
-                entropy_values = -torch.sum(p * torch.log(p + 1e-10), dim=1)
-
-                (candidate_scores, candidate_indices,) = active_learning.get_top_k_scorers(
-                    entropy_values, args.acquisition_batch_size, uncertainty="entropy",
+                (candidate_scores, candidate_indices,) = active_learning.find_acquisition_batch(
+                    probs, args.acquisition_batch_size, entropy_prob, uncertainty="entropy"
                 )
 
             elif args.al_type == "coreset":
