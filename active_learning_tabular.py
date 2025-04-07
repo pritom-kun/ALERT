@@ -250,7 +250,7 @@ if __name__ == "__main__":
             print(f"Test set: F1 (macro): ({100.0 * f1_macro:.2f}%)")
             print(f"Test set: AUROC: ({100.0 * auroc:.2f}%)")
             print(f"Test set: AUPR: ({100.0 * aupr:.2f}%)")
-            print(f"Test set: Training samples: {len(active_learning_data.training_dataset)}")
+            print(f"Training samples: {len(active_learning_data.training_dataset)}")
 
             # Save model at specific training sample counts
             save_checkpoints = [600, 1100, 1600, 2100]

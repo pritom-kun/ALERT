@@ -206,8 +206,8 @@ def al_args():
     sn_coeff = 3.0
     num_ensemble = 5
 
-    num_classes = 40 # 40 when OOD
-    num_initial_samples = 80
+    num_classes = 50 # 40 when OOD
+    num_initial_samples = 100
     max_training_samples = 2100
     acquisition_batch_size = 10
     epochs = 10
