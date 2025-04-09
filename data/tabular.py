@@ -2,6 +2,7 @@ import json
 import os
 import pickle
 
+import nlpaug.augmenter.word as naw
 import numpy as np
 import pandas as pd
 import torch
@@ -10,11 +11,14 @@ from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.preprocessing import LabelEncoder
 from torch.utils import data
 
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class TabularDataset(data.Dataset):
-    def __init__(self, data_path, save_dir=None):
+    def __init__(self, data_path, save_dir=None, transform=False):
+
+        self.transform = transform
 
         with open(data_path) as f:
             data_json = json.loads(f.read())
@@ -47,6 +51,19 @@ class TabularDataset(data.Dataset):
         self.data = self._tokenize(alldata['text'].tolist())
         self.targets = torch.from_numpy(encoder.transform(alldata[['label']])).to(torch.int64)
 
+        if self.transform:
+            # First augmentation with insert
+            aug = naw.ContextualWordEmbsAug(
+                model_path='bert-base-uncased', action="insert", device='cuda', top_k=10, aug_max=5, batch_size=16)
+            self.data_aug_ins = self._tokenize(aug.augment(alldata['text'].tolist()))
+
+            # Second augmentation with substitute
+            aug = naw.ContextualWordEmbsAug(
+                model_path='bert-base-uncased', action="substitute", device='cuda', top_k=10, aug_max=5, batch_size=16)
+            self.data_aug_sub = self._tokenize(aug.augment(alldata['text'].tolist()))
+
+            print("Augmentation done")
+
         # Put both data and targets on GPU in advance
         self.data, self.targets = self.data.to(device), self.targets.to(device)
 
@@ -70,16 +87,24 @@ class TabularDataset(data.Dataset):
         """
         feat, target = self.data[index], self.targets[index]
 
-        return feat, target
+        if self.transform:
+            # Return augmented data
+            feat_aug_ins = self.data_aug_ins[index]
+            feat_aug_sub = self.data_aug_sub[index]
+            return feat, feat_aug_ins, feat_aug_sub, target
 
-def create_tabular_dataset(data_path, seed=0, save_dir="./saves"):
+        else:
+            return feat, target
+
+
+def create_tabular_dataset(data_path, seed=0, save_dir="./saves", transform=False):
     # Create directory for splits if it doesn't exist
     os.makedirs(save_dir, exist_ok=True)
 
     # Define paths for saving splits
     splits_file = os.path.join(save_dir, f"splits_seed_{seed}.json")
 
-    dataset = TabularDataset(data_path, save_dir)
+    dataset = TabularDataset(data_path, save_dir, transform)
 
     # Check if splits already exist
     if os.path.exists(splits_file):

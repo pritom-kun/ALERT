@@ -15,7 +15,7 @@ from data.tabular import create_tabular_dataset
 from net.bert import scibert
 
 # Import train and test utils
-from utils.train_utils import train_single_epoch, model_save_name
+from utils.train_utils import train_single_epoch, train_single_epoch_aug, model_save_name
 
 # Importing uncertainty metrics
 from metrics.uncertainty_confidence import entropy, energy_score, margin, confidence
@@ -44,6 +44,18 @@ def class_probs(data_loader):
 
 def compute_density(logits, class_probs):
     return torch.sum((torch.exp(logits) * class_probs), dim=1)
+
+
+def augmentation_collate(batch, use_augmentation=False):
+    if use_augmentation:
+        # Extract all components from the batch
+        features, aug_ins, aug_sub, targets = zip(*batch)
+        # Convert to tensors if needed
+        return torch.stack(features), torch.stack(aug_ins), torch.stack(aug_sub), torch.stack(targets)
+    else:
+        # For non-augmented data, extract only features and targets
+        features, targets = zip(*[(item[0], item[-1]) for item in batch])
+        return torch.stack(features), torch.stack(targets)
 
 
 def ambiguous_acquired(data_loader, threshold, model):
@@ -82,7 +94,12 @@ if __name__ == "__main__":
 
     # Creating the datasets
     num_classes = 50
-    train_dataset, test_dataset, tokenizer = create_tabular_dataset(data_path="./data/tabular/training-data.json", seed=args.seed)
+    train_dataset, test_dataset, tokenizer = create_tabular_dataset(
+        data_path="./data/tabular/training-data.json",
+        seed=args.seed,
+        transform=args.data_aug
+    )
+
     if args.ambiguous:
         indices = np.random.choice(len(train_dataset), args.subsample)
         mnist_train_dataset = data.Subset(train_dataset, indices)
@@ -113,8 +130,19 @@ if __name__ == "__main__":
     )
 
     kwargs = {"num_workers": 0, "pin_memory": False} if cuda else {}
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
+    val_loader = data.DataLoader(
+        val_dataset,
+        batch_size=args.test_batch_size,
+        shuffle=False,
+        collate_fn=lambda batch: augmentation_collate(batch, use_augmentation=False),
+        **kwargs
+    )
+    test_loader = data.DataLoader(test_dataset,
+        batch_size=args.test_batch_size,
+        shuffle=False,
+        collate_fn=lambda batch: augmentation_collate(batch, use_augmentation=False),
+        **kwargs
+    )
 
     # Run experiment
     num_runs = 1
@@ -143,17 +171,26 @@ if __name__ == "__main__":
         sampler = active_learning.RandomFixedLengthSampler(
             dataset=active_learning_data.training_dataset, target_length=5056
         )
-        train_loader = torch.utils.data.DataLoader(
-            active_learning_data.training_dataset, batch_size=args.train_batch_size, **kwargs,
+        train_loader = data.DataLoader(
+            active_learning_data.training_dataset,
+            batch_size=args.train_batch_size,
+             collate_fn=lambda batch: augmentation_collate(batch, use_augmentation=args.data_aug),
+            **kwargs,
         )
-
-        small_train_loader = torch.utils.data.DataLoader(
-            active_learning_data.training_dataset, shuffle=True, batch_size=args.train_batch_size, **kwargs,
+        small_train_loader = data.DataLoader(
+            active_learning_data.training_dataset,
+            shuffle=True,
+            batch_size=args.train_batch_size,
+            collate_fn=lambda batch: augmentation_collate(batch, use_augmentation=False),
+            **kwargs,
         )
-
         # Pool loader for the current acquired training set
-        pool_loader = torch.utils.data.DataLoader(
-            active_learning_data.pool_dataset, batch_size=args.scoring_batch_size, shuffle=False, **kwargs,
+        pool_loader = data.DataLoader(
+            active_learning_data.pool_dataset,
+            batch_size=args.scoring_batch_size,
+            shuffle=False,
+            collate_fn=lambda batch: augmentation_collate(batch, use_augmentation=False),
+            **kwargs,
         )
 
         # Run active learning iterations
@@ -186,6 +223,8 @@ if __name__ == "__main__":
                 if args.al_type == "ensemble":
                     for (model, optimizer) in zip(model_ensemble, optimizers):
                         train_single_epoch(epoch, model, train_loader, optimizer, device)
+                elif args.data_aug:
+                    train_single_epoch_aug(epoch, model, train_loader, optimizer, device)
                 else:
                     train_single_epoch(epoch, model, train_loader, optimizer, device)
 
@@ -390,7 +429,7 @@ if __name__ == "__main__":
         ambiguous_file_name = f"results/ambiguous_{save_name}_{args.al_type}{save_ensemble_mi}_dirty_mnist_{args.subsample}.json"
         ambiguous_entropies_file_name = f"results/ambiguous_entropies_{save_name}_{args.al_type}{save_ensemble_mi}_dirty_mnist_{args.subsample}.json"
     else:
-        accuracy_file_name = f"results/metrics_{save_name}_{args.al_type}{save_ensemble_mi}_tabular.json"
+        accuracy_file_name = f"results/metrics_{save_name}_{args.al_type}{save_ensemble_mi}_tabular_aug.json"
 
     with open(accuracy_file_name, "w") as acc_file:
         json.dump(test_accs, acc_file)

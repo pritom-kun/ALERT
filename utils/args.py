@@ -214,9 +214,9 @@ def al_args():
 
     mc_dropout_passes = 10
 
-    train_batch_size = 16
-    test_batch_size = 16
-    scoring_batch_size = 16
+    train_batch_size = 8
+    test_batch_size = 8
+    scoring_batch_size = 8
 
     parser = argparse.ArgumentParser(description="Active Learning Experiments")
     parser.add_argument("--seed", type=int, dest="seed", required=True, help="Seed to use")
@@ -241,6 +241,9 @@ def al_args():
         dest="trained_model_name",
         help="Trained model to check entropy of acquired samples",
     )
+
+    parser.add_argument("--data-aug", action="store_true", dest="data_aug")
+    parser.set_defaults(data_aug=False)
 
     parser.add_argument(
         "-tsn", action="store_true", dest="tsn", help="whether to use spectral normalisation",

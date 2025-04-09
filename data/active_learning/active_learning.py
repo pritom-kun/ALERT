@@ -96,7 +96,7 @@ def get_balanced_sample_indices(dataset: data.Dataset, num_classes, n_per_digit=
 
     for _, permed_index in enumerate(permed_indices):
         permed_index = int(permed_index)
-        _, label = dataset[permed_index]
+        label = dataset[permed_index][-1]
         index, target = permed_index, int(label)
 
         num_target_samples = num_samples_by_class[target]
