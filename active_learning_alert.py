@@ -32,11 +32,10 @@ from utils.ensemble_utils import ensemble_forward_pass
 
 
 def class_probs(data_loader):
-    num_classes = 50
     class_n = len(data_loader.dataset)
-    class_count = torch.zeros(num_classes)
+    class_count = torch.zeros(args.num_classes)
     for data, label in data_loader:
-        class_count += torch.Tensor([torch.sum(label == c) for c in range(num_classes)])
+        class_count += torch.Tensor([torch.sum(label == c) for c in range(args.num_classes)])
 
     class_prob = class_count / class_n
     return class_prob
@@ -93,7 +92,6 @@ if __name__ == "__main__":
     model_fn = scibert
 
     # Creating the datasets
-    num_classes = 50
     train_dataset, test_dataset, tokenizer = create_tabular_dataset(
         data_path="./data/tabular/training-data.json",
         seed=args.seed,
@@ -109,7 +107,7 @@ if __name__ == "__main__":
 
     # Load pretrained network for checking ambiguous samples
     if args.ambiguous:
-        pretrained_net = model_fn(tokenizer, num_classes).to(device)
+        pretrained_net = model_fn(tokenizer, args.num_classes).to(device)
         pretrained_net = torch.nn.DataParallel(pretrained_net, device_ids=range(torch.cuda.device_count()))
         cudnn.benchmark = True
         pretrained_net.load_state_dict(torch.load(args.saved_model_path + args.saved_model_name))
@@ -126,7 +124,7 @@ if __name__ == "__main__":
     train_dataset = data.Subset(train_dataset, train_idx)
 
     initial_sample_indices = active_learning.get_balanced_sample_indices(
-        train_dataset, num_classes=num_classes, n_per_digit=args.num_initial_samples / num_classes,
+        train_dataset, num_classes=args.num_classes, n_per_digit=args.num_initial_samples / args.num_classes,
     )
 
     kwargs = {"num_workers": 0, "pin_memory": False} if cuda else {}
@@ -203,7 +201,7 @@ if __name__ == "__main__":
             eps = 1e-8
             if args.al_type == "ensemble":
                 model_ensemble = [
-                    model_fn(tokenizer, num_classes).to(device=device)
+                    model_fn(tokenizer, args.num_classes).to(device=device)
                     for _ in range(args.num_ensemble)
                 ]
                 optimizers = []
@@ -211,7 +209,7 @@ if __name__ == "__main__":
                     optimizers.append(torch.optim.Adam(model.parameters(), weight_decay=weight_decay))
                     model.train()
             else:
-                model = model_fn(tokenizer, num_classes).to(device=device)
+                model = model_fn(tokenizer, args.num_classes).to(device=device)
                 optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=eps)
                 model.train()
 
@@ -248,7 +246,7 @@ if __name__ == "__main__":
                 embeddings, labels = get_embeddings(
                     model, small_train_loader, num_dim=768, dtype=torch.double, device=device, storage_device="cuda",
                 )
-                gaussians_model, jitter_eps = gmm_fit(embeddings=embeddings, labels=labels, num_classes=num_classes)
+                gaussians_model, jitter_eps = gmm_fit(embeddings=embeddings, labels=labels, num_classes=args.num_classes)
 
             elif args.al_type == "dropout":
                 # Train the dropout head
@@ -256,7 +254,7 @@ if __name__ == "__main__":
                 embeddings, labels = get_embeddings(
                     model, small_train_loader, num_dim=768, dtype=torch.float32, device=device, storage_device="cuda",
                 )
-                dropout_head = train_dropout(embeddings, labels, num_classes, args.train_batch_size, epochs=10, device=device)
+                dropout_head = train_dropout(embeddings, labels, args.num_classes, args.train_batch_size, epochs=10, device=device)
 
             print("Training ended")
 
@@ -335,7 +333,7 @@ if __name__ == "__main__":
                     gaussians_model,
                     pool_loader,
                     device=device,
-                    num_classes=num_classes,
+                    num_classes=args.num_classes,
                     storage_device="cpu",
                 )
                 (candidate_scores, candidate_indices,) = active_learning.get_top_k_scorers(

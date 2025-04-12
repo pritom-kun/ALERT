@@ -149,10 +149,10 @@ def create_tabular_ood_dataset(data_path, num_id_classes=40, seed=0, save_dir=".
     os.makedirs(save_dir, exist_ok=True)
 
     # Define paths for saving splits
-    splits_file = os.path.join(save_dir, f"ood_splits_seed_{seed}_ratio_{0.2}.json")
+    splits_file = os.path.join(save_dir, f"ood_splits_seed_{seed}_idclass_{num_id_classes}.json")
 
     dataset = TabularDataset(data_path, save_dir)
-    
+
     # Get all unique classes
     all_classes = torch.unique(dataset.targets).cpu().numpy()
     all_classes_sorted = sorted([int(x) for x in all_classes])

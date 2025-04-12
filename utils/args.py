@@ -214,9 +214,9 @@ def al_args():
 
     mc_dropout_passes = 10
 
-    train_batch_size = 8
-    test_batch_size = 8
-    scoring_batch_size = 8
+    train_batch_size = 16
+    test_batch_size = 16
+    scoring_batch_size = 16
 
     parser = argparse.ArgumentParser(description="Active Learning Experiments")
     parser.add_argument("--seed", type=int, dest="seed", required=True, help="Seed to use")
