@@ -266,7 +266,7 @@ if __name__ == "__main__":
                         storage_device="cpu",
                     )
                     (candidate_scores, candidate_indices,) = active_learning.get_top_k_scorers(
-                        compute_density(logits, class_prob), args.acquisition_batch_size, uncertainty=False,
+                        compute_density(logits, class_prob), args.acquisition_batch_size, uncertainty="gmm",
                     )
                 else:
                     logits = []

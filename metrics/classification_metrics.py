@@ -1,15 +1,9 @@
-"""
-Metrics to measure classification performance
-"""
-
 import torch
-from torch import nn
+from sklearn.metrics import accuracy_score, confusion_matrix
 from torch.nn import functional as F
+from torchmetrics import AUROC, Accuracy, AveragePrecision, F1Score
 
 from utils.ensemble_utils import ensemble_forward_pass
-
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import confusion_matrix
 
 
 def get_logits_labels(model, data_loader, device):
@@ -55,24 +49,58 @@ def test_classification_net_softmax(softmax_prob, labels):
     )
 
 
-def test_classification_net_logits(logits, labels):
+def test_classification_net_auc_roc(softmax_prob, labels, device):
+    """
+    Calculate classification metrics using TorchMetrics.
+    
+    Args:
+        softmax_prob (torch.Tensor): Softmax probabilities from model
+        labels (torch.Tensor): Ground truth labels
+        num_classes (int): Number of classes
+        
+    Returns:
+        tuple: (accuracy, auroc, average_precision, f1_micro, f1_macro)
+    """
+
+    num_classes = softmax_prob.shape[-1]
+    # Initialize metrics
+    accuracy_metric = Accuracy(task="multiclass", num_classes=num_classes).to(device)
+    auroc_metric = AUROC(task="multiclass", num_classes=num_classes).to(device)
+    aupr_metric = AveragePrecision(task="multiclass", num_classes=num_classes).to(device)
+    f1_micro_metric = F1Score(task="multiclass", num_classes=num_classes, average="micro").to(device)
+    f1_macro_metric = F1Score(task="multiclass", num_classes=num_classes, average="macro").to(device)
+
+    # Calculate metrics
+    accuracy = accuracy_metric(softmax_prob, labels)
+    auroc = auroc_metric(softmax_prob, labels)
+    aupr = aupr_metric(softmax_prob, labels)
+    f1_micro = f1_micro_metric(softmax_prob, labels)
+    f1_macro = f1_macro_metric(softmax_prob, labels)
+
+    return accuracy.item(), f1_micro.item(), f1_macro.item(), auroc.item(), aupr.item()
+
+
+def test_classification_net_logits(logits, labels, device='cpu', auc_roc=False):
     """
     This function reports classification accuracy and confusion matrix given logits and labels
     from a model.
     """
     softmax_prob = F.softmax(logits, dim=1)
-    return test_classification_net_softmax(softmax_prob, labels)
+    if auc_roc:
+        return test_classification_net_auc_roc(softmax_prob, labels, device)
+    else:
+        return test_classification_net_softmax(softmax_prob, labels)
 
 
-def test_classification_net(model, data_loader, device):
+def test_classification_net(model, data_loader, device, auc_roc=False):
     """
     This function reports classification accuracy and confusion matrix over a dataset.
     """
     logits, labels = get_logits_labels(model, data_loader, device)
-    return test_classification_net_logits(logits, labels)
+    return test_classification_net_logits(logits, labels, device, auc_roc)
 
 
-def test_classification_net_ensemble(model_ensemble, data_loader, device):
+def test_classification_net_ensemble(model_ensemble, data_loader, device, auc_roc=False):
     """
     This function reports classification accuracy and confusion matrix over a dataset
     for a deep ensemble.
@@ -92,4 +120,7 @@ def test_classification_net_ensemble(model_ensemble, data_loader, device):
     softmax_prob = torch.cat(softmax_prob, dim=0)
     labels = torch.cat(labels, dim=0)
 
-    return test_classification_net_softmax(softmax_prob, labels)
+    if auc_roc:
+        return test_classification_net_auc_roc(softmax_prob, labels)
+    else:
+        return test_classification_net_softmax(softmax_prob, labels)

@@ -52,6 +52,57 @@ def train_single_epoch(
     return train_loss / num_samples
 
 
+def train_single_epoch_aug(
+    epoch, model, train_loader, optimizer, device, loss_function="cross_entropy", loss_mean=False,
+):
+    """
+    Util method for training a model for a single epoch.
+    """
+    log_interval = 10
+    model.train()
+    train_loss = 0
+    num_samples = 0
+    for batch_idx, (data, aug_ins, aug_sub, labels) in enumerate(train_loader):
+        data = data.to(device)
+        aug_ins = aug_ins.to(device)
+        aug_sub = aug_sub.to(device)
+        labels = labels.to(device)
+
+        optimizer.zero_grad()
+
+        logits = model(data)
+        logits_aug_ins = model(aug_ins)
+        logits_aug_sub = model(aug_sub)
+
+        loss = loss_function_dict[loss_function](logits, labels)
+        loss += loss_function_dict[loss_function](logits_aug_ins, labels)
+        loss += loss_function_dict[loss_function](logits_aug_sub, labels)
+
+        loss = loss / 3
+
+        if loss_mean:
+            loss = loss / len(data)
+
+        loss.backward()
+        train_loss += loss.item()
+        optimizer.step()
+        num_samples += len(data)
+
+        if batch_idx % log_interval == 0:
+            print(
+                "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
+                    epoch,
+                    batch_idx * len(data),
+                    len(train_loader) * len(data),
+                    100.0 * batch_idx / len(train_loader),
+                    loss.item(),
+                )
+            )
+
+    print("====> Epoch: {} Average loss: {:.4f}".format(epoch, train_loss / num_samples))
+    return train_loss / num_samples
+
+
 def test_single_epoch(epoch, model, test_val_loader, device, loss_function="cross_entropy"):
     """
     Util method for testing a model for a single epoch.

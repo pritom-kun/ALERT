@@ -5,6 +5,7 @@ from typing import List
 import numpy as np
 import torch
 import torch.utils.data as data
+from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
 class ActiveLearningData:
@@ -93,9 +94,9 @@ def get_balanced_sample_indices(dataset: data.Dataset, num_classes, n_per_digit=
     num_samples_by_class = collections.defaultdict(int)
     initial_samples = []
 
-    for i in range(len(permed_indices)):
-        permed_index = int(permed_indices[i])
-        _, label = dataset[permed_index]
+    for _, permed_index in enumerate(permed_indices):
+        permed_index = int(permed_index)
+        label = dataset[permed_index][-1]
         index, target = permed_index, int(label)
 
         num_target_samples = num_samples_by_class[target]
@@ -112,16 +113,65 @@ def get_balanced_sample_indices(dataset: data.Dataset, num_classes, n_per_digit=
 
 
 # Acquisition functionality
-def get_top_k_scorers(scores_N, batch_size, uncertainty=True):
+def get_top_k_scorers(scores_N, batch_size, uncertainty="entropy"):
     N = len(scores_N)
     batch_size = min(batch_size, N)
-    candidate_scores, candidate_indices = torch.topk(scores_N, batch_size, largest=uncertainty)
+    largest = True if uncertainty in ["entropy", "energy"] else False
+    candidate_scores, candidate_indices = torch.topk(scores_N, batch_size, largest=largest)
     return candidate_scores.tolist(), candidate_indices.tolist()
 
 
-def find_acquisition_batch(logits, batch_size, score_function, uncertainty=True):
+def find_acquisition_batch(logits, batch_size, score_function, uncertainty="entropy"):
     scores = score_function(logits)
     return get_top_k_scorers(scores, batch_size=batch_size, uncertainty=uncertainty)
+
+
+def greedy_coreset_selection(unlabeled_embeddings, labeled_embeddings, batch_size):
+    """
+    Select samples using the greedy Coreset method.
+    
+    Args:
+        unlabeled_embeddings: Embeddings of unlabeled data (numpy array or torch tensor)
+        labeled_embeddings: Embeddings of labeled data (numpy array or torch tensor)
+        batch_size: Number of samples to select
+    
+    Returns:
+        Tuple of (candidate_scores, candidate_indices) in the format expected by ActiveLearningData
+    """
+    # Convert to numpy if they are torch tensors
+    if isinstance(unlabeled_embeddings, torch.Tensor):
+        unlabeled_embeddings = unlabeled_embeddings.cpu().numpy()
+    if isinstance(labeled_embeddings, torch.Tensor):
+        labeled_embeddings = labeled_embeddings.cpu().numpy()
+
+    a = unlabeled_embeddings.copy()
+    b = labeled_embeddings.copy()
+
+    candidate_indices = []
+    candidate_scores = []
+    original_indices = np.arange(len(a))
+
+    for _ in range(min(batch_size, len(a))):
+        if len(a) == 0:
+            break
+
+        # Find distances from each unlabeled point to its closest labeled point
+        distances = pairwise_distances_argmin_min(a, b)[1]
+        # Select the point with maximum distance (furthest from any labeled point)
+        max_distance_index = int(np.argmax(distances))
+        # Add this index to our candidates
+        candidate_indices.append(int(original_indices[max_distance_index]))
+
+        max_distance = float(distances[max_distance_index])
+        candidate_scores.append(max_distance)
+
+        # Add the selected point to the labeled set
+        b = np.vstack((b, a[max_distance_index:max_distance_index+1]))
+        # Remove the selected point from consideration
+        a = np.delete(a, max_distance_index, axis=0)
+        original_indices = np.delete(original_indices, max_distance_index)
+
+    return candidate_scores, candidate_indices
 
 
 class RandomFixedLengthSampler(data.Sampler):

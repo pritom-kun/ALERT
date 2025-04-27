@@ -194,26 +194,29 @@ def eval_args():
 
 
 def al_args():
-    model_name = "resnet18"
-    trained_model_name = "resnet18_sn"
+    model_name = "scibert"
+    trained_model_name = "scibert"
     saved_model_path = "./"
-    saved_model_name = "resnet18_sn_3.0_50.model"
+    saved_model_name = "scibert.model"
     dataset_root = "./"
     threshold = 1.0
     subsample = 1000
-    al_acquisition = "softmax"
+    al_acquisition = "gmm"
 
     sn_coeff = 3.0
     num_ensemble = 5
 
-    num_initial_samples = 20
-    max_training_samples = 300
-    acquisition_batch_size = 5
-    epochs = 20
+    num_classes = 50 # 40 when OOD
+    num_initial_samples = 100
+    max_training_samples = 2100
+    acquisition_batch_size = 10
+    epochs = 10
 
-    train_batch_size = 64
-    test_batch_size = 512
-    scoring_batch_size = 128
+    mc_dropout_passes = 10
+
+    train_batch_size = 16
+    test_batch_size = 16
+    scoring_batch_size = 16
 
     parser = argparse.ArgumentParser(description="Active Learning Experiments")
     parser.add_argument("--seed", type=int, dest="seed", required=True, help="Seed to use")
@@ -238,6 +241,9 @@ def al_args():
         dest="trained_model_name",
         help="Trained model to check entropy of acquired samples",
     )
+
+    parser.add_argument("--data-aug", action="store_true", dest="data_aug")
+    parser.set_defaults(data_aug=False)
 
     parser.add_argument(
         "-tsn", action="store_true", dest="tsn", help="whether to use spectral normalisation",
@@ -296,13 +302,24 @@ def al_args():
         "--al-type",
         type=str,
         default=al_acquisition,
-        choices=["softmax", "ensemble", "gmm"],
+        choices=["entropy", "energy", "confidence", "margin", "gmm", "dropout", "coreset", "ensemble", "random"],
         dest="al_type",
         help="Type of model to use for AL.",
     )
 
     parser.add_argument("-mi", action="store_true", dest="mi", help="Use MI as acquisition function")
     parser.set_defaults(mi=False)
+
+    parser.add_argument('--mc_dropout_passes', type=int, default=mc_dropout_passes,
+                    help='Number of forward passes for Monte Carlo Dropout')
+
+    parser.add_argument(
+        "--num-classes",
+        type=int,
+        default=num_classes,
+        dest="num_classes",
+        help="Number of classes in the training dataset",
+    )
 
     parser.add_argument(
         "--num-initial-samples",

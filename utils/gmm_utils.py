@@ -102,7 +102,7 @@ def gmm_fit(embeddings, labels, num_classes):
                 if "cholesky" in str(e):
                     continue
             except ValueError as e:
-                if "The parameter covariance_matrix has invalid values" in str(e):
+                if "satisfy the constraint PositiveDefinite(), but found invalid values" in str(e):
                     continue
             break
 
