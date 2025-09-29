@@ -194,10 +194,11 @@ def eval_args():
 
 
 def al_args():
-    model_name = "scibert"
+    model_name = "scibert" # scibert, roberta, modernbert
     trained_model_name = "scibert"
     saved_model_path = "./"
     saved_model_name = "scibert.model"
+    default_dataset = "tram"
     dataset_root = "./"
     threshold = 1.0
     subsample = 1000
@@ -206,11 +207,26 @@ def al_args():
     sn_coeff = 3.0
     num_ensemble = 5
 
-    num_classes = 50 # 40 when OOD
-    num_initial_samples = 100
-    max_training_samples = 2100
+    # TRAM
+    # num_classes = 50 # 40 when OOD
+    # num_initial_samples = 100
+    # max_training_samples = 2100
+    # acquisition_batch_size = 10
+    # epochs = 10
+
+    # CTI2MITRE
+    num_classes = 188 # 40 when OOD
+    num_initial_samples = 10356
+    max_training_samples = 10356
     acquisition_batch_size = 10
     epochs = 10
+
+    # CTI-HAL
+    # num_classes = 68 # 40 when OOD
+    # num_initial_samples = 68
+    # max_training_samples = 268
+    # acquisition_batch_size = 10
+    # epochs = 10
 
     mc_dropout_passes = 10
 
@@ -227,6 +243,9 @@ def al_args():
         "-ambiguous", action="store_true", dest="ambiguous", help="Use Ambiguous MNIST in training",
     )
     parser.set_defaults(ambiguous=False)
+    parser.add_argument(
+        "--dataset", type=str, default=default_dataset, dest="dataset", help="dataset to train on",
+    )
     parser.add_argument(
         "--dataset-root",
         type=str,

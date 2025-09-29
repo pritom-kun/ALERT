@@ -6,7 +6,7 @@ import nlpaug.augmenter.word as naw
 import numpy as np
 import pandas as pd
 import torch
-import transformers
+from transformers import AutoTokenizer
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.preprocessing import LabelEncoder
 from torch.utils import data
@@ -15,8 +15,14 @@ from torch.utils import data
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class TabularDataset(data.Dataset):
-    def __init__(self, data_path, save_dir=None, transform=False):
+class TramDataset(data.Dataset):
+    def __init__(
+        self,
+        data_path,
+        tokenizer_name,
+        save_dir=None,
+        transform=False
+    ):
 
         self.transform = transform
 
@@ -31,7 +37,7 @@ class TabularDataset(data.Dataset):
             ]
         )
 
-        self.tokenizer = transformers.BertTokenizer.from_pretrained("allenai/scibert_scivocab_uncased", max_length=512)
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
         encoder_path = os.path.join(save_dir, "label_encoder.pkl")
 
@@ -97,14 +103,20 @@ class TabularDataset(data.Dataset):
             return feat, target
 
 
-def create_tabular_dataset(data_path, seed=0, save_dir="./saves", transform=False):
+def create_tram_dataset(
+        data_path,
+        tokenizer_name,
+        seed=0,
+        save_dir="./saves", 
+        transform=False
+    ):
     # Create directory for splits if it doesn't exist
     os.makedirs(save_dir, exist_ok=True)
 
     # Define paths for saving splits
     splits_file = os.path.join(save_dir, f"splits_seed_{seed}.json")
 
-    dataset = TabularDataset(data_path, save_dir, transform)
+    dataset = TramDataset(data_path, tokenizer_name, save_dir, transform)
 
     # Check if splits already exist
     if os.path.exists(splits_file):
@@ -135,7 +147,13 @@ def create_tabular_dataset(data_path, seed=0, save_dir="./saves", transform=Fals
     return train_dataset, test_dataset, dataset.tokenizer
 
 
-def create_tabular_ood_dataset(data_path, num_id_classes=40, seed=0, save_dir="./saves"):
+def create_tram_ood_dataset(
+        data_path,
+        tokenizer_name,
+        num_id_classes=40,
+        seed=0,
+        save_dir="./saves"
+    ):
     """
     Create dataset with left-out classes for OOD detection.
     
@@ -151,7 +169,7 @@ def create_tabular_ood_dataset(data_path, num_id_classes=40, seed=0, save_dir=".
     # Define paths for saving splits
     splits_file = os.path.join(save_dir, f"ood_splits_seed_{seed}_idclass_{num_id_classes}.json")
 
-    dataset = TabularDataset(data_path, save_dir)
+    dataset = TramDataset(data_path, tokenizer_name, save_dir)
 
     # Get all unique classes
     all_classes = torch.unique(dataset.targets).cpu().numpy()

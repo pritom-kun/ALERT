@@ -9,10 +9,10 @@ from torch.backends import cudnn
 from torch.utils import data
 from data.active_learning import active_learning
 from data.ambiguous_mnist.ambiguous_mnist_dataset import AmbiguousMNIST
-from data.tabular import create_tabular_ood_dataset
+from data.tram import create_tram_ood_dataset
 
 # Import network architectures
-from net.bert import scibert
+from net.bert import scibert, roberta, modernbert
 
 # Import train and test utils
 from utils.train_utils import train_single_epoch, model_save_name
@@ -78,11 +78,23 @@ if __name__ == "__main__":
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if cuda else "cpu")
 
-    model_fn = scibert
+    tokenizer_name = ""
+    model_fn = None
+
+    if args.model_name == "scibert":
+        model_fn = scibert
+        tokenizer_name = "allenai/scibert_scivocab_uncased"
+    elif args.model_name == "roberta":
+        model_fn = roberta
+        tokenizer_name = "roberta-base"
+    elif args.model_name == "modernbert":
+        model_fn = modernbert
+        tokenizer_name = "answerdotai/ModernBERT-base"
 
     # Creating the datasets with OOD classes held out
-    train_dataset, id_test_dataset, ood_test_dataset, tokenizer = create_tabular_ood_dataset(
-        data_path="./data/tabular/training-data.json", 
+    train_dataset, id_test_dataset, ood_test_dataset, tokenizer = create_tram_ood_dataset(
+        data_path="./data/cti/tram.json",
+        tokenizer_name=tokenizer_name,
         num_id_classes=args.num_classes,
         seed=args.seed
     )
@@ -476,7 +488,7 @@ if __name__ == "__main__":
         ambiguous_file_name = f"results/ambiguous_{save_name}_{args.al_type}{save_ensemble_mi}_dirty_mnist_{args.subsample}.json"
         ambiguous_entropies_file_name = f"results/ambiguous_entropies_{save_name}_{args.al_type}{save_ensemble_mi}_dirty_mnist_{args.subsample}.json"
     else:
-        accuracy_file_name = f"results/metrics_{save_name}_{args.al_type}{save_ensemble_mi}_ood_tabular.json"
+        accuracy_file_name = f"results/metrics_{save_name}_{args.al_type}{save_ensemble_mi}_ood_tram.json"
 
     with open(accuracy_file_name, "w") as acc_file:
         json.dump(test_accs, acc_file)
