@@ -27,8 +27,30 @@ isbn="978-3-031-65172-4"
 
 ## Dependencies
 
-The code is based on PyTorch and requires a few further dependencies, listed in [environment.yml](environment.yml). It should work with newer versions as well.
+The code is based on Python 3.14 and PyTorch 2.9.0 and requires a few further dependencies, listed in [requirements.txt](requirements.txt). It should work with newer versions as well.
 
 This codebase is based on the [*Deep Deterministic Uncertainty (DDU)*](https://github.com/omegafragger/DDU) repository.
+
+## Training
+
+In order to train a model for the Active Learning task, use the [active_learning_alert.py](active_learning_alert.py) script. Following are the main parameters for training:
+
+```
+--seed: seed for initialization
+--dataset: dataset used for training (tram/cti2mitre)
+--model: model to train (scibert/roberta-base/modernbert)
+--al-type: type of active learning acquisition model (entropy/energy/confidence/margin/gmm/dropout/coreset/ensemble/random)
+--num-initial-samples: number of initial samples in the training set
+--max-training-samples: maximum number of training samples
+--acquisition-batch-size: batch size for each acquisition step
+```
+
+As an example, to run the active learning experiment on tram using the scibert model and entropy method, use:
+
+```
+python active_learning_script.py --seed 1 --model scibert --dataset tram --al-type entropy
+```
+
+
 
 
