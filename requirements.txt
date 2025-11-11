@@ -1,0 +1,14 @@
+torch
+torchvision
+tqdm
+tensorboard
+matplotlib
+seaborn
+scikit-learn
+pandas
+transformers
+torchmetrics
+nlpaug
+openai
+google-genai
+perplexityai
