@@ -159,7 +159,7 @@ def create_cti2mitre_ood_dataset(
     os.makedirs(save_dir, exist_ok=True)
 
     # Define paths for saving splits
-    splits_file = os.path.join(save_dir, f"ood_splits_seed_{seed}_idclass_{num_id_classes}.json")
+    splits_file = os.path.join(save_dir, f"cti2mitre_ood_splits_seed_{seed}_idclass_{num_id_classes}.json")
 
     dataset = CTI2MITREDataset(data_path, tokenizer_name, save_dir)
 

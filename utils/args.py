@@ -215,9 +215,9 @@ def al_args():
     # epochs = 10
 
     # CTI2MITRE
-    num_classes = 188 # 40 when OOD
-    num_initial_samples = 10356
-    max_training_samples = 10356
+    num_classes = 50 # 40 when OOD
+    num_initial_samples = 2100
+    max_training_samples = 2100
     acquisition_batch_size = 10
     epochs = 10
 

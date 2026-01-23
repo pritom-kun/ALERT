@@ -323,12 +323,12 @@ if __name__ == "__main__":
             print(f"Training samples: {len(active_learning_data.training_dataset)}")
 
             # Save model at specific training sample counts
-            save_checkpoints = [600, 1100, 1600, 2100]
+            save_checkpoints = [600, 1100, 1600, 2100, 2600, 3100, 3600, 4000]
             curr_train_len = len(active_learning_data.training_dataset)
 
             if curr_train_len in save_checkpoints:
                 os.makedirs("checkpoints", exist_ok=True)
-                model_save_path = f"checkpoints/al_type_{args.al_type}_{curr_train_len}_samples.pt"
+                model_save_path = f"checkpoints/{args.al_type}_{args.dataset}_{curr_train_len}_samples.pt"
                 if args.al_type == "ensemble":
                     torch.save([m.state_dict() for m in model_ensemble], model_save_path)
                 else:
