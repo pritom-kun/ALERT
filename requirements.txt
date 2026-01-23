@@ -2,8 +2,13 @@ torch
 torchvision
 tqdm
 tensorboard
-numpy
-scipy
 matplotlib
 seaborn
 scikit-learn
+pandas
+transformers
+torchmetrics
+nlpaug
+openai
+google-genai
+perplexityai
