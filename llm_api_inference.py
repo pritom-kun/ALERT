@@ -1,4 +1,5 @@
 import argparse
+import os
 import json
 import random
 import time
@@ -109,7 +110,7 @@ class LLMClassifier:
         try:
             if self.model_type == 'gpt':
                 response = self.client.responses.create(
-                    model="gpt-5",  # Use mini for faster classification
+                    model="gpt-5.2",  # Use mini for faster classification
                     input=prompt,
                     reasoning={"effort": "medium"},
                     text={"verbosity": "low"}  # Concise responses
@@ -122,14 +123,17 @@ class LLMClassifier:
                     google_search=types.GoogleSearch()
                 )
                 response = self.client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-3-flash-preview",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         # temperature=0.1,  # Low temperature for deterministic output
                         # # maxOutputTokens=50,
                         # top_p=0.9,
-                        thinking_config=types.ThinkingConfig(thinking_budget=0), # Disables thinking
-                        tools=[grounding_tool]
+                        thinking_config=types.ThinkingConfig(
+                            # Options: MINIMAL, LOW, MEDIUM, HIGH
+                            thinking_level=types.ThinkingLevel.MINIMAL
+                        ),
+                        # tools=[grounding_tool]
                     ),
                 )
 
@@ -264,6 +268,7 @@ def main(args):
 
     accuracy_file_name = f"results/{args.model}.json"
 
+    os.makedirs("results", exist_ok=True)
     with open(accuracy_file_name, "w") as acc_file:
         json.dump(metrics, acc_file)
 
