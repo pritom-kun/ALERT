@@ -12,3 +12,5 @@ nlpaug
 openai
 google-genai
 perplexityai
+google-cloud-aiplatform
+anthropic

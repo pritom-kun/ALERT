@@ -1,6 +1,8 @@
 import argparse
+import concurrent.futures
 import os
 import json
+from anthropic import AnthropicFoundry
 import random
 import time
 from typing import Dict, List
@@ -19,18 +21,32 @@ np.random.seed(1)
 
 
 class LLMClassifier:
-    def __init__(self, model_type: str = 'gpt', api_key: str = None):
+    def __init__(self, model_type: str = 'gpt', api_key: str = None, rag: bool = False):
 
         self.model_type = model_type
+        self.rag = rag
 
-        if self.model_type == "gpt":
-            self.client = OpenAI(api_key=api_key)
+        if self.model_type in ["gpt", "deepseek", "llama", "kimi"]:
+            self.client = OpenAI(
+                base_url=os.environ.get('OPENAI_BASE_URL'),
+                api_key=api_key, 
+                timeout=120)
+        elif self.model_type == "claude":
+            self.client = AnthropicFoundry(
+                base_url=os.environ.get('ANTHROPIC_BASE_URL'),
+                api_key=api_key,
+            )
         elif self.model_type == "gemini":
-            self.client = genai.Client(api_key=api_key)
+            self.client = genai.Client(
+                vertexai=True,
+                project=os.environ.get('GOOGLE_CLOUD_PROJECT'), 
+                location='global', 
+                http_options={'timeout': 60000}
+            )
         elif self.model_type == "perplexity":
-            self.client = Perplexity(api_key=api_key)
+            self.client = Perplexity(api_key=api_key, timeout=60)
         else:
-            raise ValueError("Unsupported model type. Use one of 'gpt', 'gemini' or claude.")
+            raise ValueError("Unsupported model type. Use one of 'gpt', 'gemini', 'deepseek', 'llama', 'kimi' or claude.")
 
         self.class_mapping = {}
         
@@ -107,82 +123,105 @@ class LLMClassifier:
         """Classify a single text sample using GPT-5"""
         prompt = self.create_classification_prompt(text, zeroshot)
 
-        try:
-            if self.model_type == 'gpt':
-                response = self.client.responses.create(
-                    model="gpt-5.2",  # Use mini for faster classification
-                    input=prompt,
-                    reasoning={"effort": "medium"},
-                    text={"verbosity": "low"}  # Concise responses
-                )
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                if self.model_type == 'gpt':
+                    gpt_kwargs = {
+                        "model": "gpt-5.2-chat",
+                        "input": prompt,
+                        "reasoning": {"effort": "medium"},
+                    }
+                    if self.rag:
+                        gpt_kwargs["tools"] = [{"type": "web_search_preview"}]
+                    response = self.client.responses.create(**gpt_kwargs)
+                    prediction = response.output_text.strip()
 
-                prediction = response.output_text.strip()
-
-            elif self.model_type == 'gemini':
-                grounding_tool = types.Tool(
-                    google_search=types.GoogleSearch()
-                )
-                response = self.client.models.generate_content(
-                    model="gemini-3-flash-preview",
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        # temperature=0.1,  # Low temperature for deterministic output
-                        # # maxOutputTokens=50,
-                        # top_p=0.9,
-                        thinking_config=types.ThinkingConfig(
-                            # Options: MINIMAL, LOW, MEDIUM, HIGH
-                            thinking_level=types.ThinkingLevel.MINIMAL
+                elif self.model_type in ["deepseek", "llama", "kimi"]:
+                    if self.model_type == "deepseek":
+                        model_id = "DeepSeek-V3.2"
+                    elif self.model_type == "llama":
+                        model_id = "Llama-4-Maverick-17B-128E-Instruct-FP8"
+                    elif self.model_type == "kimi":
+                        model_id = "Kimi-K2.5"
+                    response = self.client.chat.completions.create(
+                        model=model_id,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    prediction = response.choices[0].message.content.strip()
+                elif self.model_type == 'claude':
+                    response = self.client.messages.create(
+                        model="claude-sonnet-4-5",
+                        max_tokens=16384,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    prediction = response.content[0].text.strip()
+                elif self.model_type == 'gemini':
+                    gemini_config = {
+                        "thinking_config": types.ThinkingConfig(
+                            thinking_level=types.ThinkingLevel.MEDIUM
                         ),
-                        # tools=[grounding_tool]
-                    ),
-                )
+                    }
+                    if self.rag:
+                        grounding_tool = types.Tool(
+                            google_search=types.GoogleSearch()
+                        )
+                        gemini_config["tools"] = [grounding_tool]
+                    response = self.client.models.generate_content(
+                        model="gemini-3-flash-preview",
+                        contents=prompt,
+                        config=types.GenerateContentConfig(**gemini_config),
+                    )
+                    prediction = response.text.strip()
 
-                prediction = response.text.strip()
+                elif self.model_type == 'perplexity':
+                    # Perplexity API implementation
+                    response = self.client.chat.completions.create(
+                        model="sonar",  # Fast reasoning model for classification
+                        messages=[{"role": "user", "content": prompt}],
+                        # temperature=0.1,  # Low temperature for deterministic output
+                        # max_tokens=50,    # Short response for classification
+                        # top_p=0.9
+                    )
+                    prediction = response.choices[0].message.content.strip()
 
-            elif self.model_type == 'perplexity':
-                # Perplexity API implementation
-                response = self.client.chat.completions.create(
-                    model="sonar",  # Fast reasoning model for classification
-                    messages=[{"role": "user", "content": prompt}],
-                    # temperature=0.1,  # Low temperature for deterministic output
-                    # max_tokens=50,    # Short response for classification
-                    # top_p=0.9
-                )
-                prediction = response.choices[0].message.content.strip()
+                # Clean and validate prediction
+                prediction = prediction.replace('"', '').replace("'", "").strip()
 
-            # Clean and validate prediction
-            prediction = prediction.replace('"', '').replace("'", "").strip()
+                # If prediction not in classes, try to match closest
+                if prediction not in classes:
+                    prediction_lower = prediction.lower()
+                    for cls in classes:
+                        if cls.lower() in prediction_lower or prediction_lower in cls.lower():
+                            return cls
+                    # If no match, return first class as default
+                    return classes[0]
 
-            # If prediction not in classes, try to match closest
-            if prediction not in classes:
-                prediction_lower = prediction.lower()
-                for cls in classes:
-                    if cls.lower() in prediction_lower or prediction_lower in cls.lower():
-                        return cls
-                # If no match, return first class as default
-                return classes[0]
+                # print(prediction)
+                return prediction
 
-            # print(prediction)
-            return prediction
-
-        except Exception as e:
-            print(f"Error in classification: {e}")
-            return classes[0]  # Return first class as fallback
+            except Exception as e:
+                print(f"Error in classification (attempt {attempt+1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                else:
+                    return classes[0]  # Return first class as fallback
+        
+        return classes[0]
 
     def classify_batch(self, texts: List[str], classes: List[str], zeroshot: bool = True) -> List[str]:
-        """Classify multiple texts"""
-        predictions = []
+        """Classify multiple texts using concurrent requests"""
+        predictions = [None] * len(texts)
 
-        for i, text in tqdm(enumerate(texts)):
-            # if i % 10 == 0:
-            #     print(f"Processing {i+1}/{len(texts)}")
+        def _classify_task(idx_text):
+            idx, text = idx_text
+            return idx, self.classify_single(text, classes, zeroshot)
 
-            pred = self.classify_single(text, classes, zeroshot)
-            predictions.append(pred)
-
-            # Small delay to avoid rate limits
-            # if i % 50 == 0: 
-            time.sleep(0.1)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=24) as executor:
+            futures = [executor.submit(_classify_task, (i, text)) for i, text in enumerate(texts)]
+            for future in tqdm(concurrent.futures.as_completed(futures), total=len(texts)):
+                idx, pred = future.result()
+                predictions[idx] = pred
 
         return predictions
 
@@ -242,10 +281,10 @@ def main(args):
     print(len(classes))
 
     # Initialize classifier
-    classifier = LLMClassifier(args.model)
+    classifier = LLMClassifier(args.model, rag=args.rag)
 
     fshot = "zero-shot" if args.zeroshot else "few-shot"
-    print(f"Starting {fshot} Classification...")
+    print(f"Starting {fshot} Classification... RAG: {args.rag}")
 
     # Get predictions
     predictions = classifier.classify_batch(df['text'].tolist(), classes, args.zeroshot)
@@ -286,6 +325,10 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--zeroshot", action="store_true", default=False, dest="zeroshot", help="zero shot or few shot",
+    )
+
+    parser.add_argument(
+        "--rag", action="store_true", default=False, dest="rag", help="enable grounding/search tools (web_search for GPT, google_search for Gemini)",
     )
 
     args = parser.parse_args()
