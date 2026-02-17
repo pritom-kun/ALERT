@@ -48,7 +48,7 @@ In order to train a model for the Active Learning task, use the [active_learning
 As an example, to run the active learning experiment on tram using the scibert model and entropy method, use:
 
 ```
-python active_learning_script.py --seed 1 --model scibert --dataset tram --al-type entropy
+python active_learning_alert.py --seed 1 --model scibert --dataset tram --al-type entropy
 ```
 
 

@@ -208,18 +208,18 @@ def al_args():
     num_ensemble = 5
 
     # TRAM
-    # num_classes = 50 # 40 when OOD
-    # num_initial_samples = 100
-    # max_training_samples = 2100
-    # acquisition_batch_size = 10
-    # epochs = 10
-
-    # CTI2MITRE
     num_classes = 50 # 40 when OOD
-    num_initial_samples = 2100
+    num_initial_samples = 100
     max_training_samples = 2100
     acquisition_batch_size = 10
     epochs = 10
+
+    # CTI2MITRE
+    # num_classes = 50 # 40 when OOD
+    # num_initial_samples = 2100
+    # max_training_samples = 2100
+    # acquisition_batch_size = 10
+    # epochs = 10
 
     # CTI-HAL
     # num_classes = 68 # 40 when OOD

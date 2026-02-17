@@ -199,9 +199,9 @@ if __name__ == "__main__":
         active_learning_data.acquire(initial_sample_indices)
 
         # Train loader for the current acquired training set
-        sampler = active_learning.RandomFixedLengthSampler(
-            dataset=active_learning_data.training_dataset, target_length=5056
-        )
+        # sampler = active_learning.RandomFixedLengthSampler(
+        #     dataset=active_learning_data.training_dataset, target_length=5056
+        # )
         train_loader = data.DataLoader(
             active_learning_data.training_dataset,
             batch_size=args.train_batch_size,
