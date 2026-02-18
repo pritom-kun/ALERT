@@ -6,11 +6,10 @@ import nlpaug.augmenter.word as naw
 import numpy as np
 import pandas as pd
 import torch
-from transformers import AutoTokenizer
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.preprocessing import LabelEncoder
 from torch.utils import data
-
+from transformers import AutoTokenizer, BertTokenizer, BertTokenizerFast
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -58,6 +57,14 @@ class TramDataset(data.Dataset):
         self.targets = torch.from_numpy(encoder.transform(alldata[['label']])).to(torch.int64)
 
         if self.transform:
+            # Patch for BertTokenizer
+            if not hasattr(BertTokenizer, '_convert_token_to_id'):
+                BertTokenizer._convert_token_to_id = lambda self, token: self.convert_tokens_to_ids(token)
+
+            # Patch for BertTokenizerFast
+            if not hasattr(BertTokenizerFast, '_convert_token_to_id'):
+                BertTokenizerFast._convert_token_to_id = lambda self, token: self.convert_tokens_to_ids(token)
+
             # First augmentation with insert
             aug = naw.ContextualWordEmbsAug(
                 model_path='bert-base-uncased', action="insert", device='cuda', top_k=10, aug_max=5, batch_size=16)

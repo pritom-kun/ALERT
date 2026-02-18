@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
     train_idx, val_idx = idxs[split:], idxs[:split]
     val_dataset = data.Subset(train_dataset, val_idx)
-    # train_dataset = data.Subset(train_dataset, train_idx)
+    train_dataset = data.Subset(train_dataset, train_idx)
 
     initial_sample_indices = active_learning.get_balanced_sample_indices(
         train_dataset, num_classes=args.num_classes, n_per_digit=args.num_initial_samples / args.num_classes,
