@@ -151,7 +151,7 @@ class LLMClassifier:
                     prediction = response.choices[0].message.content.strip()
                 elif self.model_type == 'claude':
                     response = self.client.messages.create(
-                        model="claude-sonnet-4-5",
+                        model="claude-sonnet-4-6",
                         max_tokens=16384,
                         messages=[{"role": "user", "content": prompt}],
                     )
@@ -305,7 +305,7 @@ def main(args):
     print(f"F1 Macro:     {metrics['f1_macro']:.4f}")
     print(f"F1 Micro:     {metrics['f1_micro']:.4f}")
 
-    accuracy_file_name = f"results/{args.model}.json"
+    accuracy_file_name = f"results/{args.model}_{fshot}_{'rag' if args.rag else 'no_rag'}.json"
 
     os.makedirs("results", exist_ok=True)
     with open(accuracy_file_name, "w") as acc_file:
