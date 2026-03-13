@@ -10,6 +10,7 @@ from torch.utils import data
 from data.active_learning import active_learning
 from data.ambiguous_mnist.ambiguous_mnist_dataset import AmbiguousMNIST
 from data.tram import create_tram_ood_dataset
+from data.cti2mitre import create_cti2mitre_ood_dataset
 
 # Import network architectures
 from net.bert import scibert, roberta, modernbert
@@ -91,13 +92,27 @@ if __name__ == "__main__":
         model_fn = modernbert
         tokenizer_name = "answerdotai/ModernBERT-base"
 
-    # Creating the datasets with OOD classes held out
-    train_dataset, id_test_dataset, ood_test_dataset, tokenizer = create_tram_ood_dataset(
-        data_path="./data/cti/tram.json",
-        tokenizer_name=tokenizer_name,
-        num_id_classes=args.num_classes,
-        seed=args.seed
-    )
+    train_dataset = None
+    test_dataset = None
+    tokenizer = None
+    # Creating the datasets
+    if args.dataset == "tram":
+        train_dataset, id_test_dataset, ood_test_dataset, tokenizer = create_tram_ood_dataset(
+            data_path="./data/cti/tram.json",
+            tokenizer_name=tokenizer_name,
+            num_id_classes=args.num_classes,
+            seed=args.seed
+        )
+
+    elif args.dataset == "cti2mitre":
+        train_dataset, id_test_dataset, ood_test_dataset, tokenizer = create_cti2mitre_ood_dataset(
+            data_path="./data/cti/cti2mitre.csv",
+            tokenizer_name=tokenizer_name,
+            seed=args.seed,
+            num_id_classes=args.num_classes
+        )
+    else:
+        raise ValueError("Unknown dataset")
 
     if args.ambiguous:
         indices = np.random.choice(len(train_dataset), args.subsample)
@@ -353,12 +368,12 @@ if __name__ == "__main__":
             print(f"Training samples: {len(active_learning_data.training_dataset)}")
 
             # Save model at specific training sample counts
-            save_checkpoints = [600, 1100, 1600, 2100]
+            save_checkpoints = [600, 1100, 1600, 2100, 2600, 3100, 3600, 4000]
             curr_train_len = len(active_learning_data.training_dataset)
 
             if curr_train_len in save_checkpoints:
                 os.makedirs("checkpoints", exist_ok=True)
-                model_save_path = f"checkpoints/al_type_{args.al_type}_{curr_train_len}_samples.pt"
+                model_save_path = f"checkpoints/{args.al_type}_{args.dataset}_{curr_train_len}_samples.pt"
                 if args.al_type == "ensemble":
                     torch.save([m.state_dict() for m in model_ensemble], model_save_path)
                 else:
@@ -488,7 +503,7 @@ if __name__ == "__main__":
         ambiguous_file_name = f"results/ambiguous_{save_name}_{args.al_type}{save_ensemble_mi}_dirty_mnist_{args.subsample}.json"
         ambiguous_entropies_file_name = f"results/ambiguous_entropies_{save_name}_{args.al_type}{save_ensemble_mi}_dirty_mnist_{args.subsample}.json"
     else:
-        accuracy_file_name = f"results/metrics_{save_name}_{args.al_type}{save_ensemble_mi}_ood_tram.json"
+        accuracy_file_name = f"results/metrics_{save_name}_{args.al_type}{save_ensemble_mi}_ood_{args.dataset}.json"
 
     with open(accuracy_file_name, "w") as acc_file:
         json.dump(test_accs, acc_file)

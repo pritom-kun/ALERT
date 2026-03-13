@@ -20,6 +20,7 @@ from net.vgg import vgg16
 
 # Import metrics to compute
 from metrics.classification_metrics import (
+    # brier_score,
     test_classification_net,
     test_classification_net_logits,
     test_classification_net_ensemble
@@ -78,6 +79,9 @@ if __name__ == "__main__":
     # m2 - Uncertainty/Confidence Metric 2
     #      for deterministic model: entropy, for ensemble: MI
     eces = []
+    # brier_scores = []
+    mis_aurocs = []
+    mis_auprs = []
     m1_aurocs = []
     m1_auprcs = []
     m2_aurocs = []
@@ -129,8 +133,9 @@ if __name__ == "__main__":
             )
             if args.gpu:
                 net.cuda()
-                net = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
+                # net = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
                 cudnn.benchmark = True
+            print(saved_model_name)
             net.load_state_dict(torch.load(str(saved_model_name)))
             net.eval()
 
@@ -172,10 +177,11 @@ if __name__ == "__main__":
             )
 
         else:
-            (conf_matrix, accuracy, labels_list, predictions, confidences,) = test_classification_net(
-                net, test_loader, device
+            (auroc, aupr), (conf_matrix, accuracy, labels_list, predictions, confidences,) = test_classification_net(
+                net, test_loader, device, auc=True
             )
-            ece = expected_calibration_error(confidences, predictions, labels_list, num_bins=15)
+            ece = expected_calibration_error(confidences, predictions, labels_list, num_bins=10)
+            # brier = brier_score(predictions, labels_list)
 
             temp_scaled_net = ModelWithTemperature(net)
             temp_scaled_net.set_temperature(val_loader)
@@ -184,7 +190,7 @@ if __name__ == "__main__":
             (t_conf_matrix, t_accuracy, t_labels_list, t_predictions, t_confidences,) = test_classification_net(
                 temp_scaled_net, test_loader, device
             )
-            t_ece = expected_calibration_error(t_confidences, t_predictions, t_labels_list, num_bins=15)
+            t_ece = expected_calibration_error(t_confidences, t_predictions, t_labels_list, num_bins=10)
 
             if (args.model_type == "gmm"):
                 # Evaluate a GMM model
@@ -241,6 +247,9 @@ if __name__ == "__main__":
 
         # Pre-temperature results
         eces.append(ece)
+        # brier_scores.append(brier)
+        mis_aurocs.append(auroc)
+        mis_auprs.append(aupr)
         m1_aurocs.append(m1_auroc)
         m1_auprcs.append(m1_auprc)
         m2_aurocs.append(m2_auroc)
@@ -266,75 +275,78 @@ if __name__ == "__main__":
     t_m2_auroc_tensor = torch.tensor(t_m2_aurocs)
     t_m2_auprc_tensor = torch.tensor(t_m2_auprcs)
 
-    mean_accuracy = torch.mean(accuracy_tensor)
-    mean_ece = torch.mean(ece_tensor)
-    mean_m1_auroc = torch.mean(m1_auroc_tensor)
-    mean_m1_auprc = torch.mean(m1_auprc_tensor)
-    mean_m2_auroc = torch.mean(m2_auroc_tensor)
-    mean_m2_auprc = torch.mean(m2_auprc_tensor)
+    # mean_accuracy = torch.mean(accuracy_tensor)
+    # mean_ece = torch.mean(ece_tensor)
+    # mean_m1_auroc = torch.mean(m1_auroc_tensor)
+    # mean_m1_auprc = torch.mean(m1_auprc_tensor)
+    # mean_m2_auroc = torch.mean(m2_auroc_tensor)
+    # mean_m2_auprc = torch.mean(m2_auprc_tensor)
 
-    mean_t_ece = torch.mean(t_ece_tensor)
-    mean_t_m1_auroc = torch.mean(t_m1_auroc_tensor)
-    mean_t_m1_auprc = torch.mean(t_m1_auprc_tensor)
-    mean_t_m2_auroc = torch.mean(t_m2_auroc_tensor)
-    mean_t_m2_auprc = torch.mean(t_m2_auprc_tensor)
+    # mean_t_ece = torch.mean(t_ece_tensor)
+    # mean_t_m1_auroc = torch.mean(t_m1_auroc_tensor)
+    # mean_t_m1_auprc = torch.mean(t_m1_auprc_tensor)
+    # mean_t_m2_auroc = torch.mean(t_m2_auroc_tensor)
+    # mean_t_m2_auprc = torch.mean(t_m2_auprc_tensor)
 
-    std_accuracy = torch.std(accuracy_tensor) / math.sqrt(accuracy_tensor.shape[0])
-    std_ece = torch.std(ece_tensor) / math.sqrt(ece_tensor.shape[0])
-    std_m1_auroc = torch.std(m1_auroc_tensor) / math.sqrt(m1_auroc_tensor.shape[0])
-    std_m1_auprc = torch.std(m1_auprc_tensor) / math.sqrt(m1_auprc_tensor.shape[0])
-    std_m2_auroc = torch.std(m2_auroc_tensor) / math.sqrt(m2_auroc_tensor.shape[0])
-    std_m2_auprc = torch.std(m2_auprc_tensor) / math.sqrt(m2_auprc_tensor.shape[0])
+    # std_accuracy = torch.std(accuracy_tensor) / math.sqrt(accuracy_tensor.shape[0])
+    # std_ece = torch.std(ece_tensor) / math.sqrt(ece_tensor.shape[0])
+    # std_m1_auroc = torch.std(m1_auroc_tensor) / math.sqrt(m1_auroc_tensor.shape[0])
+    # std_m1_auprc = torch.std(m1_auprc_tensor) / math.sqrt(m1_auprc_tensor.shape[0])
+    # std_m2_auroc = torch.std(m2_auroc_tensor) / math.sqrt(m2_auroc_tensor.shape[0])
+    # std_m2_auprc = torch.std(m2_auprc_tensor) / math.sqrt(m2_auprc_tensor.shape[0])
 
-    std_t_ece = torch.std(t_ece_tensor) / math.sqrt(t_ece_tensor.shape[0])
-    std_t_m1_auroc = torch.std(t_m1_auroc_tensor) / math.sqrt(t_m1_auroc_tensor.shape[0])
-    std_t_m1_auprc = torch.std(t_m1_auprc_tensor) / math.sqrt(t_m1_auprc_tensor.shape[0])
-    std_t_m2_auroc = torch.std(t_m2_auroc_tensor) / math.sqrt(t_m2_auroc_tensor.shape[0])
-    std_t_m2_auprc = torch.std(t_m2_auprc_tensor) / math.sqrt(t_m2_auprc_tensor.shape[0])
+    # std_t_ece = torch.std(t_ece_tensor) / math.sqrt(t_ece_tensor.shape[0])
+    # std_t_m1_auroc = torch.std(t_m1_auroc_tensor) / math.sqrt(t_m1_auroc_tensor.shape[0])
+    # std_t_m1_auprc = torch.std(t_m1_auprc_tensor) / math.sqrt(t_m1_auprc_tensor.shape[0])
+    # std_t_m2_auroc = torch.std(t_m2_auroc_tensor) / math.sqrt(t_m2_auroc_tensor.shape[0])
+    # std_t_m2_auprc = torch.std(t_m2_auprc_tensor) / math.sqrt(t_m2_auprc_tensor.shape[0])
 
     res_dict = {}
-    res_dict["mean"] = {}
-    res_dict["mean"]["accuracy"] = mean_accuracy.item()
-    res_dict["mean"]["ece"] = mean_ece.item()
-    res_dict["mean"]["m1_auroc"] = mean_m1_auroc.item()
-    res_dict["mean"]["m1_auprc"] = mean_m1_auprc.item()
-    res_dict["mean"]["m2_auroc"] = mean_m2_auroc.item()
-    res_dict["mean"]["m2_auprc"] = mean_m2_auprc.item()
-    res_dict["mean"]["t_ece"] = mean_t_ece.item()
-    res_dict["mean"]["t_m1_auroc"] = mean_t_m1_auroc.item()
-    res_dict["mean"]["t_m1_auprc"] = mean_t_m1_auprc.item()
-    res_dict["mean"]["t_m2_auroc"] = mean_t_m2_auroc.item()
-    res_dict["mean"]["t_m2_auprc"] = mean_t_m2_auprc.item()
+    # res_dict["mean"] = {}
+    # res_dict["mean"]["accuracy"] = mean_accuracy.item()
+    # res_dict["mean"]["ece"] = mean_ece.item()
+    # res_dict["mean"]["m1_auroc"] = mean_m1_auroc.item()
+    # res_dict["mean"]["m1_auprc"] = mean_m1_auprc.item()
+    # res_dict["mean"]["m2_auroc"] = mean_m2_auroc.item()
+    # res_dict["mean"]["m2_auprc"] = mean_m2_auprc.item()
+    # res_dict["mean"]["t_ece"] = mean_t_ece.item()
+    # res_dict["mean"]["t_m1_auroc"] = mean_t_m1_auroc.item()
+    # res_dict["mean"]["t_m1_auprc"] = mean_t_m1_auprc.item()
+    # res_dict["mean"]["t_m2_auroc"] = mean_t_m2_auroc.item()
+    # res_dict["mean"]["t_m2_auprc"] = mean_t_m2_auprc.item()
 
-    res_dict["std"] = {}
-    res_dict["std"]["accuracy"] = std_accuracy.item()
-    res_dict["std"]["ece"] = std_ece.item()
-    res_dict["std"]["m1_auroc"] = std_m1_auroc.item()
-    res_dict["std"]["m1_auprc"] = std_m1_auprc.item()
-    res_dict["std"]["m2_auroc"] = std_m2_auroc.item()
-    res_dict["std"]["m2_auprc"] = std_m2_auprc.item()
-    res_dict["std"]["t_ece"] = std_t_ece.item()
-    res_dict["std"]["t_m1_auroc"] = std_t_m1_auroc.item()
-    res_dict["std"]["t_m1_auprc"] = std_t_m1_auprc.item()
-    res_dict["std"]["t_m2_auroc"] = std_t_m2_auroc.item()
-    res_dict["std"]["t_m2_auprc"] = std_t_m2_auprc.item()
+    # res_dict["std"] = {}
+    # res_dict["std"]["accuracy"] = std_accuracy.item()
+    # res_dict["std"]["ece"] = std_ece.item()
+    # res_dict["std"]["m1_auroc"] = std_m1_auroc.item()
+    # res_dict["std"]["m1_auprc"] = std_m1_auprc.item()
+    # res_dict["std"]["m2_auroc"] = std_m2_auroc.item()
+    # res_dict["std"]["m2_auprc"] = std_m2_auprc.item()
+    # res_dict["std"]["t_ece"] = std_t_ece.item()
+    # res_dict["std"]["t_m1_auroc"] = std_t_m1_auroc.item()
+    # res_dict["std"]["t_m1_auprc"] = std_t_m1_auprc.item()
+    # res_dict["std"]["t_m2_auroc"] = std_t_m2_auroc.item()
+    # res_dict["std"]["t_m2_auprc"] = std_t_m2_auprc.item()
 
-    res_dict["mean"] = {}
-    res_dict["mean"]["accuracy"] = mean_accuracy.item()
-    res_dict["mean"]["ece"] = mean_ece.item()
-    res_dict["mean"]["m1_auroc"] = mean_m1_auroc.item()
-    res_dict["mean"]["m1_auprc"] = mean_m1_auprc.item()
-    res_dict["mean"]["m2_auroc"] = mean_m2_auroc.item()
-    res_dict["mean"]["m2_auprc"] = mean_m2_auprc.item()
-    res_dict["mean"]["t_ece"] = mean_t_ece.item()
-    res_dict["mean"]["t_m1_auroc"] = mean_t_m1_auroc.item()
-    res_dict["mean"]["t_m1_auprc"] = mean_t_m1_auprc.item()
-    res_dict["mean"]["t_m2_auroc"] = mean_t_m2_auroc.item()
-    res_dict["mean"]["t_m2_auprc"] = mean_t_m2_auprc.item()
+    # res_dict["mean"] = {}
+    # res_dict["mean"]["accuracy"] = mean_accuracy.item()
+    # res_dict["mean"]["ece"] = mean_ece.item()
+    # res_dict["mean"]["m1_auroc"] = mean_m1_auroc.item()
+    # res_dict["mean"]["m1_auprc"] = mean_m1_auprc.item()
+    # res_dict["mean"]["m2_auroc"] = mean_m2_auroc.item()
+    # res_dict["mean"]["m2_auprc"] = mean_m2_auprc.item()
+    # res_dict["mean"]["t_ece"] = mean_t_ece.item()
+    # res_dict["mean"]["t_m1_auroc"] = mean_t_m1_auroc.item()
+    # res_dict["mean"]["t_m1_auprc"] = mean_t_m1_auprc.item()
+    # res_dict["mean"]["t_m2_auroc"] = mean_t_m2_auroc.item()
+    # res_dict["mean"]["t_m2_auprc"] = mean_t_m2_auprc.item()
 
     res_dict["values"] = {}
     res_dict["values"]["accuracy"] = accuracies
     res_dict["values"]["ece"] = eces
+    # res_dict["values"]["brier_score"] = brier_scores
+    res_dict["values"]["mis_auroc"] = mis_aurocs
+    res_dict["values"]["mis_aupr"] = mis_auprs
     res_dict["values"]["m1_auroc"] = m1_aurocs
     res_dict["values"]["m1_auprc"] = m1_auprcs
     res_dict["values"]["m2_auroc"] = m2_aurocs

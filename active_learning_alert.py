@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
     train_idx, val_idx = idxs[split:], idxs[:split]
     val_dataset = data.Subset(train_dataset, val_idx)
-    # train_dataset = data.Subset(train_dataset, train_idx)
+    train_dataset = data.Subset(train_dataset, train_idx)
 
     initial_sample_indices = active_learning.get_balanced_sample_indices(
         train_dataset, num_classes=args.num_classes, n_per_digit=args.num_initial_samples / args.num_classes,
@@ -199,9 +199,9 @@ if __name__ == "__main__":
         active_learning_data.acquire(initial_sample_indices)
 
         # Train loader for the current acquired training set
-        sampler = active_learning.RandomFixedLengthSampler(
-            dataset=active_learning_data.training_dataset, target_length=5056
-        )
+        # sampler = active_learning.RandomFixedLengthSampler(
+        #     dataset=active_learning_data.training_dataset, target_length=5056
+        # )
         train_loader = data.DataLoader(
             active_learning_data.training_dataset,
             batch_size=args.train_batch_size,
@@ -323,12 +323,12 @@ if __name__ == "__main__":
             print(f"Training samples: {len(active_learning_data.training_dataset)}")
 
             # Save model at specific training sample counts
-            save_checkpoints = [600, 1100, 1600, 2100]
+            save_checkpoints = [600, 1100, 1600, 2100, 2600, 3100, 3600, 4000]
             curr_train_len = len(active_learning_data.training_dataset)
 
             if curr_train_len in save_checkpoints:
                 os.makedirs("checkpoints", exist_ok=True)
-                model_save_path = f"checkpoints/al_type_{args.al_type}_{curr_train_len}_samples.pt"
+                model_save_path = f"checkpoints/{args.al_type}_{args.dataset}_{curr_train_len}_samples.pt"
                 if args.al_type == "ensemble":
                     torch.save([m.state_dict() for m in model_ensemble], model_save_path)
                 else:

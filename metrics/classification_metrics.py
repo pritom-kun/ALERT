@@ -40,7 +40,15 @@ def test_classification_net_softmax(softmax_prob, labels):
     predictions_list.extend(predictions.cpu().numpy())
     confidence_vals_list.extend(confidence_vals.cpu().numpy())
     accuracy = accuracy_score(labels_list, predictions_list)
-    return (
+
+    # print(labels_list)
+    # print(predictions_list)
+    corrects = ((np.array(predictions_list) == np.array(labels_list))).astype(int)
+
+    auroc = roc_auc_score(corrects, confidence_vals_list)
+    auprc = average_precision_score(corrects, confidence_vals_list)
+
+    return (auroc, auprc), (
         confusion_matrix(labels_list, predictions_list),
         accuracy,
         labels_list,

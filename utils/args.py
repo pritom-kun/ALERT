@@ -20,7 +20,7 @@ def training_args():
     weight_decay = 5e-4
     log_interval = 50
     save_interval = 25
-    save_loc = "./"
+    save_loc = "./saved_models/"
     saved_model_name = "resnet50_350.model"
     epoch = 350
     first_milestone = 150  # Milestone for change in lr
@@ -134,8 +134,8 @@ def eval_args():
     default_dataset = "cifar10"
     ood_dataset = "svhn"
     batch_size = 128
-    load_loc = "../Models/Normal/"
-    model = "resnet50"
+    load_loc = "./saved_models/"
+    model = "wide_resnet"
     sn_coeff = 3.0
     runs = 5
     ensemble = 5
@@ -208,18 +208,18 @@ def al_args():
     num_ensemble = 5
 
     # TRAM
+    num_classes = 50 # 40 when OOD
+    num_initial_samples = 100
+    max_training_samples = 2100
+    acquisition_batch_size = 10
+    epochs = 10
+
+    # CTI2MITRE
     # num_classes = 50 # 40 when OOD
-    # num_initial_samples = 100
+    # num_initial_samples = 2100
     # max_training_samples = 2100
     # acquisition_batch_size = 10
     # epochs = 10
-
-    # CTI2MITRE
-    num_classes = 188 # 40 when OOD
-    num_initial_samples = 10356
-    max_training_samples = 10356
-    acquisition_batch_size = 10
-    epochs = 10
 
     # CTI-HAL
     # num_classes = 68 # 40 when OOD
